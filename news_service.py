@@ -13,6 +13,7 @@ For the workshop, you can:
 import os
 import json
 import aiohttp
+import xml.etree.ElementTree as ET
 from datetime import datetime
 from typing import Dict, Any, List, Optional
 from loguru import logger
@@ -39,61 +40,61 @@ NEWS_CATEGORIES = [
 MOCK_HEADLINES = {
     "headlines": [
         {
-            "title": "India AI Summit 2025 Kicks Off with Record Attendance",
-            "description": "The annual India AI Summit has begun with over 10,000 attendees exploring the latest in artificial intelligence and machine learning.",
-            "source": "Tech Today India",
+            "title": "Govt Introduces Strict AI Rules, Platforms Must Remove Deepfakes in 3 Hours",
+            "description": "New IT rules mandate rapid removal of AI-generated flagged content to curb misinformation.",
+            "source": "India Today",
             "published": "2 hours ago"
         },
         {
-            "title": "Intel Launches New AI PC Chips Optimized for Local LLMs",
-            "description": "Intel's latest Core Ultra processors enable running large language models entirely on personal computers without cloud dependency.",
-            "source": "Hardware Weekly",
+            "title": "India to Host 'India AI Impact Summit 2026' with Global Tech CEOs",
+            "description": "Sundar Pichai, Jensen Huang, and Sam Altman to attend the mega summit in New Delhi this week.",
+            "source": "Economic Times",
             "published": "4 hours ago"
         },
         {
-            "title": "Renewable Energy Investments Hit All-Time High",
-            "description": "Global investments in solar and wind energy have reached unprecedented levels as countries accelerate green transition.",
-            "source": "Climate Monitor",
+            "title": "ISRO Confirms Plans for Indian Space Station by 2035",
+            "description": "Chairman V. Narayanan highlights international cooperation and future milestones at Space Business Forum.",
+            "source": "The Hindu",
             "published": "6 hours ago"
         }
     ],
     "technology": [
         {
-            "title": "Voice AI Assistants Gain Traction in Enterprise Applications",
-            "description": "Companies are increasingly deploying voice-based AI agents for customer service and internal operations.",
-            "source": "Enterprise Tech",
+            "title": "India Ranks 2nd Globally in Enterprise AI Adoption",
+            "description": "Zscaler report highlights India's massive surge in AI/ML transactions, trailing only the US.",
+            "source": "TechCrunch India",
             "published": "1 hour ago"
         },
         {
-            "title": "Open Source LLMs Rival Commercial Models in Latest Benchmarks",
-            "description": "New open-source language models are achieving performance comparable to proprietary offerings.",
-            "source": "AI Research Daily",
+            "title": "Google Expands 'Results About You' Privacy Tools in India",
+            "description": "Users can now easily remove search results containing sensitive personal IDs like passports.",
+            "source": "Gadgets360",
             "published": "3 hours ago"
         },
         {
-            "title": "Edge Computing Enables Real-Time AI Processing",
-            "description": "Local AI processing on edge devices reduces latency and improves privacy for sensitive applications.",
-            "source": "Tech Insights",
+            "title": "Global E-Waste Study Tour Kicks Off in New Delhi",
+            "description": "ITU-led initiative focuses on sustainable e-waste regulation and circular economy transition.",
+            "source": "Digit.in",
             "published": "5 hours ago"
         }
     ],
     "business": [
         {
-            "title": "Markets Rally on Strong Economic Data",
-            "description": "Stock markets surged as employment figures exceeded expectations and inflation showed signs of cooling.",
-            "source": "Financial Express",
+            "title": "Indian Startups See Funding Surge: Petcare & AI Lead the Way",
+            "description": "SuperTails raises $30M Series C, while AI healthtech firms secure record early-stage capital.",
+            "source": "VentureBeat",
             "published": "30 minutes ago"
         },
         {
-            "title": "AI Startups Attract Record Venture Capital",
-            "description": "Investment in artificial intelligence companies has doubled compared to the previous year.",
-            "source": "Startup Weekly",
+            "title": "Nvidia Partner Network Expands in Indian Manufacturing Sector",
+            "description": "Local manufacturers adopt Nvidia Omniverse for digital twin simulations.",
+            "source": "Business Standard",
             "published": "2 hours ago"
         },
         {
-            "title": "NIFTY Crosses New Milestone Amid Tech Rally",
-            "description": "The benchmark index reached new highs driven by strong performance in technology and banking sectors.",
-            "source": "Market Watch India",
+            "title": "Sensex Rallies on Strong Tech Earnings and AI Optimism",
+            "description": "Markets close at record high driven by IT sector performance and global cues.",
+            "source": "Moneycontrol",
             "published": "4 hours ago"
         }
     ],
@@ -191,46 +192,103 @@ async def fetch_live_news(category: str = "headlines", country: str = "in") -> L
     Returns:
         List of news articles
     """
-    if not NEWS_API_KEY:
-        logger.warning("No NEWS_API_KEY set, using mock data")
-        return get_mock_news(category)
-    
+    # Try Google News RSS first (Free & Unlimited)
     try:
-        async with aiohttp.ClientSession() as session:
-            if category == "headlines":
-                url = f"{NEWS_API_BASE}/top-headlines"
-                params = {"country": country, "apiKey": NEWS_API_KEY, "pageSize": 5}
-            else:
-                url = f"{NEWS_API_BASE}/top-headlines"
-                params = {
-                    "country": country, 
-                    "category": category, 
-                    "apiKey": NEWS_API_KEY,
-                    "pageSize": 5
-                }
-            
-            async with session.get(url, params=params, timeout=10) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    articles = data.get("articles", [])
-                    
-                    # Transform to our format
-                    return [
-                        {
-                            "title": a.get("title", ""),
-                            "description": a.get("description", ""),
-                            "source": a.get("source", {}).get("name", "Unknown"),
-                            "published": a.get("publishedAt", "")
-                        }
-                        for a in articles[:5]
-                    ]
-                else:
-                    logger.warning(f"NewsAPI returned {response.status}, using mock data")
-                    return get_mock_news(category)
-                    
+        articles = await fetch_rss_news(category, country)
+        if articles:
+            return articles
     except Exception as e:
-        logger.error(f"Failed to fetch live news: {e}")
-        return get_mock_news(category)
+        logger.warning(f"RSS fetch failed: {e}")
+
+    # Fallback to NewsAPI if key exists
+    if NEWS_API_KEY:
+        try:
+            async with aiohttp.ClientSession() as session:
+                if category == "headlines":
+                    url = f"{NEWS_API_BASE}/top-headlines"
+                    params = {"country": country, "apiKey": NEWS_API_KEY, "pageSize": 5}
+                else:
+                    url = f"{NEWS_API_BASE}/top-headlines"
+                    params = {
+                        "country": country, 
+                        "category": category, 
+                        "apiKey": NEWS_API_KEY,
+                        "pageSize": 5
+                    }
+                
+                async with session.get(url, params=params, timeout=10) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        articles = data.get("articles", [])
+                        return [
+                            {
+                                "title": a.get("title", ""),
+                                "description": a.get("description", ""),
+                                "source": a.get("source", {}).get("name", "Unknown"),
+                                "published": a.get("publishedAt", "")
+                            }
+                            for a in articles[:5]
+                        ]
+        except Exception as e:
+            logger.error(f"NewsAPI fetch failed: {e}")
+
+    logger.info("Using mock news data as fallback")
+    return get_mock_news(category)
+
+
+async def fetch_rss_news(category: str, country: str = "IN") -> List[Dict[str, Any]]:
+    """Fetch news from Google News RSS."""
+    country_code = country.upper()
+    lang = "en"
+    
+    # Google News RSS URLs
+    base_url = "https://news.google.com/rss"
+    query_params = f"hl={lang}-{country_code}&gl={country_code}&ceid={country_code}:{lang}"
+    
+    topic_map = {
+        "headlines": f"{base_url}?{query_params}",
+        "technology": f"{base_url}/headlines/section/topic/TECHNOLOGY?{query_params}",
+        "business": f"{base_url}/headlines/section/topic/BUSINESS?{query_params}",
+        "sports": f"{base_url}/headlines/section/topic/SPORTS?{query_params}",
+        "entertainment": f"{base_url}/headlines/section/topic/ENTERTAINMENT?{query_params}",
+        "science": f"{base_url}/headlines/section/topic/SCIENCE?{query_params}",
+        "world": f"{base_url}/headlines/section/topic/WORLD?{query_params}"
+    }
+    
+    url = topic_map.get(category, topic_map["headlines"])
+    
+    logger.debug(f"Fetching RSS: {url}")
+    
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url, timeout=10) as response:
+            if response.status == 200:
+                content = await response.text()
+                root = ET.fromstring(content)
+                
+                articles = []
+                # channel -> item
+                for item in root.findall(".//item")[:5]:
+                    title = item.find("title").text if item.find("title") is not None else "No Title"
+                    pub_date = item.find("pubDate").text if item.find("pubDate") is not None else ""
+                    desc = item.find("description").text if item.find("description") is not None else ""
+                    source = item.find("source").text if item.find("source") is not None else "Google News"
+                    
+                    # Clean up title (Google News often has '... - Source')
+                    if " - " in title:
+                        source = title.split(" - ")[-1]
+                        title = " - ".join(title.split(" - ")[:-1])
+                        
+                    articles.append({
+                        "title": title,
+                        "description": title, # RSS desc often contains HTML, safer to use title or clean it
+                        "source": source,
+                        "published": pub_date
+                    })
+                
+                logger.debug(f"Fetched {len(articles)} articles via RSS")
+                return articles
+            
+    return []
 
 
 def get_mock_news(category: str = "headlines") -> List[Dict[str, Any]]:

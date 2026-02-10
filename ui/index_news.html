@@ -4,10 +4,173 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI News Anchor - Voice AI</title>
-    <link rel="stylesheet" href="ui/styles_news.css">
+    <title>AirOwl News Anchor</title>
+    <link rel="stylesheet" href="ui/styles.css">
     <script src="ui/rtvi-client.js"></script>
     <script src="ui/app_news.js" defer></script>
+
+    <style>
+        /* News Anchor Specific Styles (Inlined for reliability) */
+
+        /* Layout Tweaks */
+        .news-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .news-timestamp {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        /* Dashboard Grid Override for News */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr 340px;
+            gap: 24px;
+            display: flex !important;
+            /* Fallback/Override flex if needed */
+        }
+
+        /* News Feed Panel (Right Side) */
+        .news-feed-panel {
+            background: var(--bg-app);
+            border-radius: var(--radius-md);
+            padding: 20px;
+            overflow-y: auto;
+            max-height: 100%;
+        }
+
+        .headline-item {
+            background: white;
+            padding: 16px;
+            border-radius: var(--radius-sm);
+            margin-bottom: 12px;
+            border-left: 4px solid var(--primary);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+            transition: transform 0.2s;
+        }
+
+        .headline-item:hover {
+            transform: translateX(4px);
+        }
+
+        .headline-num {
+            font-weight: 900;
+            color: var(--primary);
+            opacity: 0.2;
+            font-size: 1.5rem;
+            float: right;
+            line-height: 1;
+        }
+
+        .headline-text {
+            font-family: var(--font-heading);
+            font-weight: 700;
+            color: var(--text-main);
+            display: block;
+            margin-bottom: 6px;
+            font-size: 0.95rem;
+            line-height: 1.4;
+        }
+
+        .headline-source {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .headline-source::before {
+            content: '';
+            display: block;
+            width: 6px;
+            height: 6px;
+            background: var(--warning);
+            border-radius: 50%;
+        }
+
+        /* Category Tags */
+        .category-rack {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+
+        .category-btn {
+            background: white;
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            padding: 8px 16px;
+            border-radius: 100px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: var(--text-body);
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: var(--font-heading);
+        }
+
+        .category-btn:hover {
+            background: var(--bg-app);
+            color: var(--primary);
+            transform: translateY(-1px);
+        }
+
+        .category-btn.active {
+            background: var(--text-main);
+            color: white;
+            border-color: var(--text-main);
+            box-shadow: 0 4px 12px rgba(26, 35, 126, 0.2);
+        }
+
+        /* Style Rack */
+        .style-rack {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .style-btn {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid rgba(0, 0, 0, 0.05);
+            background: white;
+            border-radius: var(--radius-sm);
+            font-weight: 700;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .style-btn.active {
+            border-color: var(--primary);
+            color: var(--primary);
+            background: #F5F9FF;
+        }
+
+        /* Speaking Animation Logic */
+        .speaking .pupil {
+            animation: speak-scan 0.5s infinite alternate ease-in-out;
+        }
+
+        @keyframes speak-scan {
+            0% {
+                transform: translate(-50%, -50%) scale(1);
+            }
+
+            100% {
+                transform: translate(-50%, -50%) scale(1.15);
+            }
+        }
+    </style>
 </head>
 
 <body>
@@ -15,16 +178,16 @@
         <!-- Sidebar -->
         <nav class="main-nav">
             <div class="nav-brand">
-                <div class="brand-icon">📰</div>
+                <div class="brand-icon">📺</div>
                 <div class="brand-text">NewsBot</div>
             </div>
 
-            <button class="nav-item active" data-tab="dashboard" id="tabDashboard">
-                <span>🎙️ Live Session</span>
+            <button class="nav-item active" data-tab="dashboard">
+                <span>🔴 Live Studio</span>
             </button>
 
-            <button class="nav-item" data-tab="config" id="tabConfig">
-                <span>⚙️ Settings</span>
+            <button class="nav-item" data-tab="config">
+                <span>📰 Editorial Board</span>
             </button>
 
             <div class="nav-spacer"></div>
@@ -34,100 +197,87 @@
                 <span class="status-text">Standby</span>
             </div>
 
-            <button id="startBtn" class="action-btn primary">Start Talking</button>
-            <button id="stopBtn" class="action-btn danger" style="display: none;">End Session</button>
+            <button id="startBtn" class="action-btn primary">Go On Air</button>
+            <button id="stopBtn" class="action-btn danger" style="display: none;">Cut Feed</button>
         </nav>
 
         <!-- Main Content -->
         <main class="main-content">
 
-            <!-- VIEW: LIVE SESSION -->
+            <!-- VIEW: LIVE -->
             <div id="view-dashboard" class="view-panel active">
                 <div class="dashboard-grid">
 
-                    <!-- LEFT COLUMN: Anchor Avatar & Chat -->
+                    <!-- LEFT COLUMN: Visage & Chat -->
                     <div class="main-column">
 
-                        <!-- NEWS ANCHOR AVATAR -->
-                        <div class="card panel-anchor">
-                            <div class="anchor-avatar" id="anchorContainer">
-                                <div class="anchor-icon">🎙️</div>
-                                <div class="sound-waves">
-                                    <div class="wave"></div>
-                                    <div class="wave"></div>
-                                    <div class="wave"></div>
+                        <!-- NEWS ANCHOR VISAGE -->
+                        <div class="card panel-visage"
+                            style="background: linear-gradient(135deg, #0D47A1 0%, #1565C0 100%);">
+                            <div class="airowl-eyes-container" id="anchorContainer">
+                                <div class="eye left"
+                                    style="width: 80px; height: 80px; background:white; border-color:white; box-shadow:0 0 30px rgba(0,0,0,0.2);">
+                                    <div class="pupil" style="background: #2962FF; width: 30px; height: 30px;">
+                                        <div class="pupil-highlight" style="background:white; opacity:0.6;"></div>
+                                    </div>
+                                    <div class="eyelid" style="background: #0D47A1;"></div>
+                                </div>
+                                <div class="eye right"
+                                    style="width: 80px; height: 80px; background:white; border-color:white; box-shadow:0 0 30px rgba(0,0,0,0.2);">
+                                    <div class="pupil" style="background: #2962FF; width: 30px; height: 30px;">
+                                        <div class="pupil-highlight" style="background:white; opacity:0.6;"></div>
+                                    </div>
+                                    <div class="eyelid" style="background: #0D47A1;"></div>
                                 </div>
                             </div>
-                            <div class="anchor-status" id="avatarStatus">Ready to Report</div>
+                            <div class="visage-status" id="avatarStatus">News Desk Ready</div>
                         </div>
 
-                        <!-- Conversation Transcript -->
+                        <!-- Conversation -->
                         <div class="card panel-comms" style="flex:1; margin-top:20px;">
-                            <div class="card-title">Live Transcript</div>
+                            <div class="card-title">
+                                <span>🗣️ Broadcast Log</span>
+                                <span class="badge"
+                                    style="font-size:0.7rem; background:#E3F2FD; color:#1565C0; padding:4px 8px; border-radius:4px;">LIVE
+                                    TRANSCRIPT</span>
+                            </div>
                             <div id="chatContainer" class="chat-container">
                                 <div class="bubble assistant">
                                     <span class="bubble-label">NewsBot</span>
-                                    Good day! I'm your AI news anchor. Ask me about headlines, technology, business, sports, or world news.
+                                    Welcome to the India AI Summit broadcast. I am ready for your headlines.
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- RIGHT COLUMN: News Categories & Metrics -->
-                    <section class="panel-intel">
+                    <!-- RIGHT COLUMN: News Feed & Controls -->
+                    <section class="panel-intel news-feed-panel">
 
-                        <!-- News Categories -->
-                        <div class="card category-card">
-                            <div class="card-title">📂 News Categories</div>
-                            <div class="category-grid">
-                                <button class="category-btn active" data-category="headlines">
-                                    <span class="cat-icon">📰</span>
-                                    <span class="cat-label">Headlines</span>
-                                </button>
-                                <button class="category-btn" data-category="technology">
-                                    <span class="cat-icon">💻</span>
-                                    <span class="cat-label">Tech</span>
-                                </button>
-                                <button class="category-btn" data-category="business">
-                                    <span class="cat-icon">📈</span>
-                                    <span class="cat-label">Business</span>
-                                </button>
-                                <button class="category-btn" data-category="sports">
-                                    <span class="cat-icon">⚽</span>
-                                    <span class="cat-label">Sports</span>
-                                </button>
-                                <button class="category-btn" data-category="entertainment">
-                                    <span class="cat-icon">🎬</span>
-                                    <span class="cat-label">Entertainment</span>
-                                </button>
-                                <button class="category-btn" data-category="science">
-                                    <span class="cat-icon">🔬</span>
-                                    <span class="cat-label">Science</span>
-                                </button>
-                            </div>
-                            <button id="refreshNewsBtn" class="refresh-btn">
-                                🔄 Refresh News
-                            </button>
+                        <div class="news-header">
+                            <div class="card-title" style="margin:0;">📰 Wire Service</div>
+                            <button id="refreshNewsBtn" class="category-btn active" style="font-size:0.7rem;">🔄
+                                Sync</button>
                         </div>
 
-                        <!-- Current Headlines Preview -->
-                        <div class="card headlines-card">
-                            <div class="card-title">📋 Latest Headlines</div>
-                            <div id="headlinesPreview" class="headlines-list">
-                                <div class="headline-item">
-                                    <span class="headline-text">Loading news...</span>
-                                </div>
-                            </div>
-                            <div class="news-timestamp" id="newsTimestamp">
-                                Last updated: --
+                        <div class="category-rack">
+                            <span class="category-btn active" data-category="headlines">Headlines</span>
+                            <span class="category-btn" data-category="technology">Tech</span>
+                            <span class="category-btn" data-category="business">Biz</span>
+                            <span class="category-btn" data-category="sports">Sports</span>
+                        </div>
+
+                        <div id="headlinesPreview">
+                            <!-- JS Injects News Here -->
+                            <div class="headline-item" style="opacity:0.6;">
+                                <span class="headline-text">Waiting for news feed...</span>
                             </div>
                         </div>
 
-                        <!-- System Metrics -->
-                        <div class="card metrics-card">
-                            <div class="card-title">⚡ System Latency</div>
+                        <div class="card metrics-card"
+                            style="margin-top:20px; border:none; padding:0; box-shadow:none;">
+                            <div class="card-title">Performance</div>
                             <div class="metric-row-compact">
-                                <span class="m-label">LISTENING</span>
+                                <span class="m-label">HEARING</span>
                                 <span class="m-value" id="sttTime">--</span> ms
                             </div>
                             <div class="metric-row-compact">
@@ -144,83 +294,52 @@
                 </div>
             </div>
 
-            <!-- VIEW: SETTINGS -->
+            <!-- VIEW: CONFIG -->
             <div id="view-config" class="view-panel">
                 <div class="config-container">
 
                     <div class="config-section">
-                        <div class="section-head">🎙️ Anchor Configuration</div>
-                        <p style="margin-bottom:20px; color:var(--text-muted)">
-                            Customize how your AI News Anchor behaves and speaks.
-                        </p>
+                        <div class="section-head">📝 Editorial Guidelines</div>
 
-                        <!-- Anchor Style -->
                         <div class="control-group">
-                            <label class="control-label">Anchor Style</label>
-                            <div class="style-options">
-                                <button class="style-btn active" data-style="professional">
-                                    👔 Professional
-                                </button>
-                                <button class="style-btn" data-style="casual">
-                                    😊 Casual
-                                </button>
-                                <button class="style-btn" data-style="enthusiastic">
-                                    🎉 Enthusiastic
-                                </button>
+                            <label class="control-label">Anchor Persona</label>
+                            <div class="style-rack" style="display:flex; gap:10px;">
+                                <button class="style-btn active" data-style="professional">👔 Pro</button>
+                                <button class="style-btn" data-style="casual">☕ Casual</button>
+                                <button class="style-btn" data-style="enthusiastic">⚡ Energy</button>
                             </div>
                         </div>
 
-                        <!-- Custom Instructions -->
                         <div class="control-group">
-                            <label class="control-label">Custom Instructions</label>
-                            <textarea id="customPrompt" class="modern-input" rows="4"
-                                placeholder="Add specific instructions (e.g., 'Focus on positive news', 'Always mention India-related implications')..."></textarea>
+                            <label class="control-label">Instruction Override</label>
+                            <textarea id="customPrompt" class="modern-input" rows="6"
+                                placeholder="E.g., 'Speak like a 1920s radio announcer' or 'Focus on AI ethics'..."></textarea>
                         </div>
 
                         <button id="deployConfigBtn" class="deploy-btn">
-                            ⚡ Update Anchor
+                            ⚡ Update Newscaster
                         </button>
                     </div>
 
                     <div class="config-section">
-                        <div class="section-head">🎛️ Voice Settings</div>
+                        <div class="section-head">🎛️ Parameters</div>
 
                         <div class="control-group">
                             <label class="control-label" style="display:flex; justify-content:space-between;">
                                 <span>Response Length</span>
-                                <span id="tokensDisplay" style="color:var(--primary)">100</span>
+                                <span id="tokensDisplay" style="color:var(--primary)">50</span>
                             </label>
-                            <input type="range" id="llmTokens" min="50" max="200" value="100">
+                            <input type="range" id="llmTokens" min="10" max="250" value="50">
                         </div>
 
                         <div class="control-group">
                             <label class="control-label" style="display:flex; justify-content:space-between;">
-                                <span>Creativity</span>
+                                <span>Creativity (Temp)</span>
                                 <span id="tempDisplay" style="color:var(--primary)">0.3</span>
                             </label>
                             <input type="range" id="llmTemp" min="0" max="1" step="0.1" value="0.3">
                         </div>
-
-                        <div class="control-group">
-                            <label class="control-label">
-                                <input type="checkbox" id="liveNewsToggle" checked>
-                                Enable Live News Fetching
-                            </label>
-                        </div>
                     </div>
-
-                    <!-- Sample Questions -->
-                    <div class="config-section">
-                        <div class="section-head">💡 Try These Questions</div>
-                        <div class="sample-questions">
-                            <button class="sample-q">"What are the top headlines today?"</button>
-                            <button class="sample-q">"Tell me about technology news"</button>
-                            <button class="sample-q">"How are the markets doing?"</button>
-                            <button class="sample-q">"Any sports updates?"</button>
-                            <button class="sample-q">"What's happening in the world?"</button>
-                        </div>
-                    </div>
-
                 </div>
             </div>
 

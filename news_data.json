@@ -19,7 +19,7 @@
       "published": "6 hours ago"
     }
   ],
-  "_updated": "2026-02-10T23:44:47.912136",
+  "_updated": "2026-02-10T23:53:41.099900",
   "entertainment": [
     {
       "title": "Bollywood Film Breaks Box Office Records",
@@ -38,6 +38,26 @@
       "description": "The prestigious festival will showcase diverse films from over 50 countries.",
       "source": "Cinema Today",
       "published": "6 hours ago"
+    }
+  ],
+  "science": [
+    {
+      "title": "ISRO Announces Ambitious Space Mission",
+      "description": "India's space agency reveals plans for advanced deep space exploration missions.",
+      "source": "Science India",
+      "published": "1 hour ago"
+    },
+    {
+      "title": "Breakthrough in Quantum Computing Announced",
+      "description": "Researchers achieve significant milestone in quantum error correction.",
+      "source": "Tech Science Journal",
+      "published": "3 hours ago"
+    },
+    {
+      "title": "Climate Scientists Report Positive Developments",
+      "description": "New data suggests some environmental protection measures are showing results.",
+      "source": "Environment Today",
+      "published": "5 hours ago"
     }
   ]
 }
