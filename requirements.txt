@@ -1,0 +1,28 @@
+# India AI Summit 2025 - Voice AI Workshop
+# =========================================
+# Session 4: Climate Buddy (AirOwl)
+# Session 5: News Anchor Voice AI
+#
+# Install with: pip install -r requirements.txt
+# Or with uv: uv pip install -r requirements.txt
+
+# Core framework (includes Ollama LLM, Piper & Kokoro TTS, WebRTC transport)
+pipecat-ai[webrtc,silero,piper,ollama,kokoro]>=0.0.99
+
+# Web server
+fastapi>=0.104.0
+uvicorn>=0.24.0
+python-multipart>=0.0.9
+
+# Local AI Execution
+faster-whisper>=1.0.0
+onnxruntime-gpu>=1.16.0 ; sys_platform == 'win32'
+
+# HTTP client for TTS
+aiohttp>=3.9.0
+
+# Environment variables
+python-dotenv>=1.0.0
+
+# Logging
+loguru>=0.7.0

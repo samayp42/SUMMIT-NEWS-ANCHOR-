@@ -1,0 +1,86 @@
+# Workshop Docker Compose
+# =======================
+# Pre-configured for the India AI Summit 2025 Workshop
+# All services optimized for Intel AI PCs
+
+services:
+  # Speech-to-Text: Faster Whisper
+  whisper-stt:
+    image: fedirz/faster-whisper-server:latest-cpu
+    container_name: workshop-whisper
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - WHISPER__MODEL=tiny # Fastest model for demo
+      - WHISPER__INFERENCE_DEVICE=cpu
+      - WHISPER__COMPUTE_TYPE=int8 # Optimized for Intel
+      - WHISPER__MODEL_TTL=-1 # Keep model loaded
+    volumes:
+      - whisper-data:/root/.cache/huggingface
+    mem_limit: 4g
+    cpus: 4
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Large Language Model: Ollama
+  ollama-llm:
+    image: ollama/ollama:latest
+    container_name: workshop-ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    environment:
+      - OLLAMA_KEEP_ALIVE=-1 # Keep model loaded
+      - OLLAMA_NUM_PARALLEL=2 # Handle multiple requests
+    volumes:
+      - ollama-data:/root/.ollama
+    mem_limit: 12g
+    cpus: 6
+    command: serve
+  # Text-to-Speech: Piper (Running locally in Python instead)
+  # piper-tts:
+  #   build:
+  #     context: ../local-bot/piper
+  #     dockerfile: Dockerfile
+  #   container_name: workshop-piper
+  #   restart: unless-stopped
+  #   ports:
+  #     - "5000:5000"
+  #   volumes:
+  #     - piper-data:/data
+  #   mem_limit: 2g
+  #   cpus: 2
+  #   healthcheck:
+  #     test: [ "CMD", "curl", "-f", "http://localhost:5000/health" ]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+
+volumes:
+  whisper-data:
+  ollama-data:
+    # piper-data:
+
+    # For GPU-enabled machines (Intel Arc or compatible):
+    # Uncomment and modify the ollama-llm section:
+    #
+    #   ollama-llm:
+    #     image: ollama/ollama:latest
+    #     container_name: workshop-ollama
+    #     restart: unless-stopped
+    #     ports:
+    #       - "11434:11434"
+    #     environment:
+    #       - OLLAMA_KEEP_ALIVE=-1
+    #     volumes:
+    #       - ollama-data:/root/.ollama
+    #     deploy:
+    #       resources:
+    #         reservations:
+    #           devices:
+    #             - capabilities: [gpu]
+    #     command: serve

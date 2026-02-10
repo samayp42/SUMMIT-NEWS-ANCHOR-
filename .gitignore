@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+
+# Models
+*.bin
+*.pt
+*.onnx
+hf_cache/
+kokoro-v0_19.onnx
+voices.bin
+
+# VS Code
+.vscode/
+
+# Logs
+*.log
+*.wav

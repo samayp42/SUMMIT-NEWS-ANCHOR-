@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI News Anchor - Voice AI</title>
+    <link rel="stylesheet" href="ui/styles_news.css">
+    <script src="ui/rtvi-client.js"></script>
+    <script src="ui/app_news.js" defer></script>
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <nav class="main-nav">
+            <div class="nav-brand">
+                <div class="brand-icon">📰</div>
+                <div class="brand-text">NewsBot</div>
+            </div>
+
+            <button class="nav-item active" data-tab="dashboard" id="tabDashboard">
+                <span>🎙️ Live Session</span>
+            </button>
+
+            <button class="nav-item" data-tab="config" id="tabConfig">
+                <span>⚙️ Settings</span>
+            </button>
+
+            <div class="nav-spacer"></div>
+
+            <div class="connection-status" id="connectionStatus">
+                <div class="status-indicator"></div>
+                <span class="status-text">Standby</span>
+            </div>
+
+            <button id="startBtn" class="action-btn primary">Start Talking</button>
+            <button id="stopBtn" class="action-btn danger" style="display: none;">End Session</button>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+
+            <!-- VIEW: LIVE SESSION -->
+            <div id="view-dashboard" class="view-panel active">
+                <div class="dashboard-grid">
+
+                    <!-- LEFT COLUMN: Anchor Avatar & Chat -->
+                    <div class="main-column">
+
+                        <!-- NEWS ANCHOR AVATAR -->
+                        <div class="card panel-anchor">
+                            <div class="anchor-avatar" id="anchorContainer">
+                                <div class="anchor-icon">🎙️</div>
+                                <div class="sound-waves">
+                                    <div class="wave"></div>
+                                    <div class="wave"></div>
+                                    <div class="wave"></div>
+                                </div>
+                            </div>
+                            <div class="anchor-status" id="avatarStatus">Ready to Report</div>
+                        </div>
+
+                        <!-- Conversation Transcript -->
+                        <div class="card panel-comms" style="flex:1; margin-top:20px;">
+                            <div class="card-title">Live Transcript</div>
+                            <div id="chatContainer" class="chat-container">
+                                <div class="bubble assistant">
+                                    <span class="bubble-label">NewsBot</span>
+                                    Good day! I'm your AI news anchor. Ask me about headlines, technology, business, sports, or world news.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- RIGHT COLUMN: News Categories & Metrics -->
+                    <section class="panel-intel">
+
+                        <!-- News Categories -->
+                        <div class="card category-card">
+                            <div class="card-title">📂 News Categories</div>
+                            <div class="category-grid">
+                                <button class="category-btn active" data-category="headlines">
+                                    <span class="cat-icon">📰</span>
+                                    <span class="cat-label">Headlines</span>
+                                </button>
+                                <button class="category-btn" data-category="technology">
+                                    <span class="cat-icon">💻</span>
+                                    <span class="cat-label">Tech</span>
+                                </button>
+                                <button class="category-btn" data-category="business">
+                                    <span class="cat-icon">📈</span>
+                                    <span class="cat-label">Business</span>
+                                </button>
+                                <button class="category-btn" data-category="sports">
+                                    <span class="cat-icon">⚽</span>
+                                    <span class="cat-label">Sports</span>
+                                </button>
+                                <button class="category-btn" data-category="entertainment">
+                                    <span class="cat-icon">🎬</span>
+                                    <span class="cat-label">Entertainment</span>
+                                </button>
+                                <button class="category-btn" data-category="science">
+                                    <span class="cat-icon">🔬</span>
+                                    <span class="cat-label">Science</span>
+                                </button>
+                            </div>
+                            <button id="refreshNewsBtn" class="refresh-btn">
+                                🔄 Refresh News
+                            </button>
+                        </div>
+
+                        <!-- Current Headlines Preview -->
+                        <div class="card headlines-card">
+                            <div class="card-title">📋 Latest Headlines</div>
+                            <div id="headlinesPreview" class="headlines-list">
+                                <div class="headline-item">
+                                    <span class="headline-text">Loading news...</span>
+                                </div>
+                            </div>
+                            <div class="news-timestamp" id="newsTimestamp">
+                                Last updated: --
+                            </div>
+                        </div>
+
+                        <!-- System Metrics -->
+                        <div class="card metrics-card">
+                            <div class="card-title">⚡ System Latency</div>
+                            <div class="metric-row-compact">
+                                <span class="m-label">LISTENING</span>
+                                <span class="m-value" id="sttTime">--</span> ms
+                            </div>
+                            <div class="metric-row-compact">
+                                <span class="m-label">THINKING</span>
+                                <span class="m-value" id="llmTime">--</span> ms
+                            </div>
+                            <div class="metric-row-compact">
+                                <span class="m-label">SPEAKING</span>
+                                <span class="m-value" id="ttsTime">--</span> ms
+                            </div>
+                        </div>
+
+                    </section>
+                </div>
+            </div>
+
+            <!-- VIEW: SETTINGS -->
+            <div id="view-config" class="view-panel">
+                <div class="config-container">
+
+                    <div class="config-section">
+                        <div class="section-head">🎙️ Anchor Configuration</div>
+                        <p style="margin-bottom:20px; color:var(--text-muted)">
+                            Customize how your AI News Anchor behaves and speaks.
+                        </p>
+
+                        <!-- Anchor Style -->
+                        <div class="control-group">
+                            <label class="control-label">Anchor Style</label>
+                            <div class="style-options">
+                                <button class="style-btn active" data-style="professional">
+                                    👔 Professional
+                                </button>
+                                <button class="style-btn" data-style="casual">
+                                    😊 Casual
+                                </button>
+                                <button class="style-btn" data-style="enthusiastic">
+                                    🎉 Enthusiastic
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Custom Instructions -->
+                        <div class="control-group">
+                            <label class="control-label">Custom Instructions</label>
+                            <textarea id="customPrompt" class="modern-input" rows="4"
+                                placeholder="Add specific instructions (e.g., 'Focus on positive news', 'Always mention India-related implications')..."></textarea>
+                        </div>
+
+                        <button id="deployConfigBtn" class="deploy-btn">
+                            ⚡ Update Anchor
+                        </button>
+                    </div>
+
+                    <div class="config-section">
+                        <div class="section-head">🎛️ Voice Settings</div>
+
+                        <div class="control-group">
+                            <label class="control-label" style="display:flex; justify-content:space-between;">
+                                <span>Response Length</span>
+                                <span id="tokensDisplay" style="color:var(--primary)">100</span>
+                            </label>
+                            <input type="range" id="llmTokens" min="50" max="200" value="100">
+                        </div>
+
+                        <div class="control-group">
+                            <label class="control-label" style="display:flex; justify-content:space-between;">
+                                <span>Creativity</span>
+                                <span id="tempDisplay" style="color:var(--primary)">0.3</span>
+                            </label>
+                            <input type="range" id="llmTemp" min="0" max="1" step="0.1" value="0.3">
+                        </div>
+
+                        <div class="control-group">
+                            <label class="control-label">
+                                <input type="checkbox" id="liveNewsToggle" checked>
+                                Enable Live News Fetching
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Sample Questions -->
+                    <div class="config-section">
+                        <div class="section-head">💡 Try These Questions</div>
+                        <div class="sample-questions">
+                            <button class="sample-q">"What are the top headlines today?"</button>
+                            <button class="sample-q">"Tell me about technology news"</button>
+                            <button class="sample-q">"How are the markets doing?"</button>
+                            <button class="sample-q">"Any sports updates?"</button>
+                            <button class="sample-q">"What's happening in the world?"</button>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+        </main>
+    </div>
+</body>
+
+</html>

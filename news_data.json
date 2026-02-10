@@ -1,0 +1,43 @@
+{
+  "headlines": [
+    {
+      "title": "India AI Summit 2025 Kicks Off with Record Attendance",
+      "description": "The annual India AI Summit has begun with over 10,000 attendees exploring the latest in artificial intelligence.",
+      "source": "Tech Today India",
+      "published": "2 hours ago"
+    },
+    {
+      "title": "Intel Launches New AI PC Chips Optimized for Local LLMs",
+      "description": "Intel's latest Core Ultra processors enable running large language models entirely on personal computers.",
+      "source": "Hardware Weekly",
+      "published": "4 hours ago"
+    },
+    {
+      "title": "Renewable Energy Investments Hit All-Time High",
+      "description": "Global investments in solar and wind energy have reached unprecedented levels.",
+      "source": "Climate Monitor",
+      "published": "6 hours ago"
+    }
+  ],
+  "_updated": "2026-02-10T23:44:47.912136",
+  "entertainment": [
+    {
+      "title": "Bollywood Film Breaks Box Office Records",
+      "description": "The latest blockbuster has become the highest-grossing Indian film in international markets.",
+      "source": "Film Fare",
+      "published": "2 hours ago"
+    },
+    {
+      "title": "Music Streaming Hits New Peak in India",
+      "description": "Digital music consumption has reached record levels with millions of new subscribers.",
+      "source": "Entertainment Daily",
+      "published": "4 hours ago"
+    },
+    {
+      "title": "International Film Festival Announces Lineup",
+      "description": "The prestigious festival will showcase diverse films from over 50 countries.",
+      "source": "Cinema Today",
+      "published": "6 hours ago"
+    }
+  ]
+}
