@@ -1,178 +1,245 @@
-# 📰 News Anchor Voice AI - Session 5
-## India AI Summit 2025 - Pipecat Voice AI Workshop
+# 📰 NewsBot Studio — AI News Anchor
 
-Build a **Voice-to-Voice AI News Reporter** that listens to your questions, fetches real-time news, and responds with natural speech — all running locally on Intel AI PC!
+> A **Voice-to-Voice AI News Reporter** that listens, fetches live news, and speaks back — running 100% locally on your machine.
 
 ![Voice AI](https://img.shields.io/badge/AI-Voice%20Agent-red)
 ![Pipecat](https://img.shields.io/badge/Framework-Pipecat-blue)
-![Local First](https://img.shields.io/badge/Privacy-Local%20Only-green)
+![Local First](https://img.shields.io/badge/Privacy-100%25%20Local-green)
+![Intel](https://img.shields.io/badge/Optimized-Intel%20AI%20PC-0071C5)
 
 ---
 
-## 🎯 What Makes This Different
+## ✨ What It Does
 
-| Previous Sessions | Session 5 |
-|-------------------|-----------|
-| Text input/output | **Voice input/output** |
-| Type and read | **Speak and listen** |
-| Single modality | **Multi-modal (STT + LLM + TTS)** |
+You **speak** to an AI News Anchor. It **listens**, **thinks**, and **speaks back** with the latest news — all in real-time, all running locally.
 
-**This is the first voice-to-voice AI session!**
+```
+🎤 You speak  →  🧠 AI understands  →  📰 Fetches news  →  🔊 Speaks back
+```
+
+**No cloud APIs. No subscriptions. No data leaving your machine.**
 
 ---
 
 ## 🏗️ Architecture
 
 ```
-🎤 Your Voice
-    │
-    ▼
-┌─────────────────┐
-│   WHISPER STT   │  (Speech-to-Text)
-│   (Local)       │  Your voice → Text
-└────────┬────────┘
+🎤 Your Microphone
+     │
+     ▼
+┌──────────────────┐
+│  Faster-Whisper   │   Speech → Text (local, GPU-accelerated)
+│  STT (base)       │
+└────────┬─────────┘
          │
          ▼
-┌─────────────────┐    ┌─────────────┐
-│   OLLAMA LLM    │◄──►│  NEWS API   │
-│   (Local)       │    │  (Internet) │
-└────────┬────────┘    └─────────────┘
+┌──────────────────┐    ┌─────────────────┐
+│  Ollama LLM       │◄──►│ Google News RSS  │
+│  (gemma3:4b)      │    │ (Free, live)    │
+└────────┬─────────┘    └─────────────────┘
          │
          ▼
-┌─────────────────┐
-│   PIPER TTS     │  (Text-to-Speech)
-│   (Local)       │  Text → AI Voice
-└────────┬────────┘
+┌──────────────────┐
+│  Kokoro TTS       │   Text → Natural Speech (local)
+│  (af_heart voice) │
+└────────┬─────────┘
          │
          ▼
 🔊 AI Speaks Back
 ```
 
+All services connected via **Pipecat AI** pipeline with **WebRTC** transport.
+
 ---
 
-## 🚀 Quick Start
+## 🚀 Getting Started
 
-### 1. Ensure Docker Services are Running
+### Prerequisites
+
+| Tool | Purpose | Install |
+|------|---------|---------|
+| **Python 3.10+** | Runtime | [python.org](https://www.python.org/downloads/) |
+| **Ollama** | Local LLM | [ollama.ai](https://ollama.ai/) |
+| **Docker Desktop** | Whisper STT (fallback) | [docker.com](https://www.docker.com/) |
+| **Git** | Clone this repo | [git-scm.com](https://git-scm.com/) |
+
+### Step 1 — Clone & Setup
 
 ```bash
-docker-compose up -d
+git clone https://github.com/YOUR_USERNAME/SUMMIT-NEWS-ANCHOR-.git
+cd SUMMIT-NEWS-ANCHOR-
 ```
 
-### 2. Pull the LLM Model (if not already done)
+Create a virtual environment:
 
 ```bash
-docker exec -it workshop-ollama ollama pull llama3.2:1b
+python -m venv venv
+
+# Windows
+venv\Scripts\activate
+
+# macOS/Linux
+source venv/bin/activate
 ```
 
-### 3. (Optional) Set News API Key
-
-Get a free key from [newsapi.org](https://newsapi.org/) and add to `.env`:
+Install dependencies:
 
 ```bash
-cp .env.example .env
-# Edit .env and add your NEWS_API_KEY
+pip install -r requirements.txt
 ```
 
-> **Note:** Mock headlines will be used if no API key is set. Perfect for offline demos!
-
-### 4. Run the News Anchor Bot
+### Step 2 — Pull the LLM Model
 
 ```bash
-# Using uv (recommended)
-uv run bot_news_anchor.py
+ollama pull gemma3:4b
+```
 
-# Or using python
+> First pull downloads ~2.5 GB. After that it's cached locally.
+
+### Step 3 — Configure (Optional)
+
+```bash
+copy .env.example .env
+```
+
+Edit `.env` if you want to customize:
+
+```env
+OLLAMA_URL=http://127.0.0.1:11434/v1
+LLM_MODEL=gemma3:4b
+BOT_PORT=7860
+```
+
+> **News API key is NOT required.** The bot fetches live news from Google News RSS for free. Mock headlines are used as fallback when offline.
+
+### Step 4 — One-Click Start
+
+**Windows:**
+```bash
+start.bat
+```
+
+**Manual start:**
+```bash
+# Terminal 1: Start Ollama
+ollama serve
+
+# Terminal 2: Start the bot
 python bot_news_anchor.py
 ```
 
-### 5. Open the UI
+### Step 5 — Open the Studio
 
-Navigate to: **http://localhost:7860/**
+Navigate to: **[http://localhost:7860](http://localhost:7860)**
 
-Click "Start Talking" and ask about the news! 🎙️
+Click **"Go Live"** and start talking! 🎙️
 
 ---
 
-## 🎤 Sample Voice Commands
-
-Try saying:
+## 🎤 What to Say
 
 | You Say | AI Responds |
 |---------|-------------|
-| "What are the top headlines today?" | Summary of current top stories |
-| "Tell me about technology news" | Latest tech updates |
-| "How are the markets doing?" | Business and market summary |
-| "Any sports updates?" | Latest sports news |
-| "What's happening in the world?" | International news briefing |
-| "Tell me more about that first story" | Expanded details |
+| "What are the top headlines?" | Summary of current top stories |
+| "Tell me about tech news" | Latest technology updates |
+| "How are the markets?" | Business and startup news |
+| "Any sports updates?" | Cricket, IPL, sports highlights |
+| "Tell me more about that story" | Expanded details |
+| "What's happening in science?" | ISRO, research, discoveries |
 
 ---
 
-## 🎛️ Features
+## 🖥️ Studio Interface
 
-### 📂 News Categories
-Switch between different news types:
-- 📰 Headlines (Top Stories)
-- 💻 Technology
-- 📈 Business & Markets
-- ⚽ Sports
-- 🎬 Entertainment
-- 🔬 Science
+The UI is a **broadcast control room** with three panels:
 
-### 🎭 Anchor Personalities
-Choose your news anchor style:
-- 👔 **Professional** - Clear, authoritative reporting
-- 😊 **Casual** - Friendly, conversational updates
-- 🎉 **Enthusiastic** - Energetic morning show style
+| Panel | What It Shows |
+|-------|---------------|
+| **Left Sidebar** | Navigation, connection status, Go Live button |
+| **Center Stage** | AI Anchor orb (animates when speaking), live transcript, breaking news ticker |
+| **Right Wire Panel** | Category filters (Top/Tech/Biz/Sport), live headlines, latency metrics |
 
-### ⚡ Real-Time Updates
-- Live news fetching from NewsAPI
-- Instant category switching
-- Real-time prompt updates
-
-### 📊 Performance Metrics
-- STT Latency (Listening)
-- LLM Latency (Thinking)
-- TTS Latency (Speaking)
+**Features:**
+- 🎨 Clean Apple-inspired light theme
+- ◉ Animated AI orb with pulsing rings
+- 📊 Real-time latency monitoring (STT / LLM / TTS)
+- 📡 Live news wire with category switching
+- 🔴 ON AIR badge activates on connection
+- 📺 Breaking news ticker at the bottom
 
 ---
 
 ## 📁 Project Structure
 
 ```
-workshop/
-├── bot_news_anchor.py     # Main News Anchor bot
-├── news_service.py        # News API integration
-├── ui/
-│   ├── index_news.html    # News Anchor UI
-│   ├── app_news.js        # News Anchor controller
-│   └── styles_news.css    # News theme styles
-├── knowledge_base/
-│   ├── news_reporting.txt     # Journalism basics
-│   └── india_news_context.txt # India-specific context
-├── docker-compose.yml     # Docker services
-└── requirements.txt       # Python dependencies
+SUMMIT-NEWS-ANCHOR-/
+├── bot_news_anchor.py      # Main bot — pipeline, routes, prompts
+├── news_service.py         # News fetching (RSS + mock fallback)
+├── start.bat               # One-click startup script (Windows)
+├── requirements.txt        # Python dependencies
+├── .env.example            # Environment variable template
+├── .gitignore              # Git ignore rules
+├── docker-compose.yml      # Docker services (optional)
+├── news_data.json          # Cached news data (auto-generated)
+│
+└── ui/
+    ├── index_news.html     # Studio UI (HTML + inline CSS)
+    ├── app_news.js         # Frontend controller (WebRTC, RTVI)
+    └── rtvi-client.js      # RTVI client library
 ```
 
 ---
 
-## 🔧 Configuration
+## ⚙️ Configuration
 
 ### Environment Variables
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `NEWS_API_KEY` | NewsAPI.org API key | (uses mock data) |
-| `LLM_MODEL` | Ollama model | `llama3.2:1b` |
-| `TTS_VOICE` | Piper voice | `en_US-lessac-medium` |
-| `BOT_PORT` | Server port | `7860` |
+| `OLLAMA_URL` | Ollama API endpoint | `http://localhost:11434/v1` |
+| `LLM_MODEL` | Which Ollama model to use | `gemma3:4b` |
+| `BOT_PORT` | Web server port | `7860` |
+| `NEWS_API_KEY` | NewsAPI.org key (optional fallback) | *(empty — uses RSS)* |
 
-### Custom Instructions
+### Anchor Personalities
 
-Add custom behavior in the Settings panel:
-- "Focus on positive news"
-- "Always mention India-related implications"
-- "Use more technical vocabulary"
+Switch in the Control Room tab:
+
+| Style | Behavior |
+|-------|----------|
+| 👔 **Pro** | Clear, authoritative, breaking-news tone |
+| ☕ **Chill** | Friendly, conversational updates |
+| ⚡ **Hype** | Energetic, morning-show energy |
+
+### Custom Directives
+
+Type anything in the "Directive Override" box:
+- *"Speak like a 1920s radio announcer"*
+- *"Focus only on AI and startup news"*
+- *"Be sarcastic about everything"*
+
+---
+
+## 🔧 Tech Stack
+
+| Component | Technology | Runs On |
+|-----------|------------|---------|
+| **Speech-to-Text** | Faster-Whisper (`base` model) | Local (auto-detects GPU) |
+| **LLM** | Ollama + Gemma 3 4B | Local |
+| **Text-to-Speech** | Kokoro TTS (`af_heart` voice, 82M params) | Local (OpenVINO/CUDA/CPU) |
+| **Pipeline** | Pipecat AI | Local |
+| **Transport** | WebRTC (SmallWebRTCTransport) | Browser ↔ Server |
+| **News Source** | Google News RSS (free, unlimited) | Internet |
+| **Fallback News** | Curated mock headlines | Offline |
+| **Frontend** | Vanilla HTML/CSS/JS | Browser |
+| **Server** | FastAPI + Uvicorn | Local |
+| **VAD** | Silero VAD (400ms silence detection) | Local |
+
+### Intel AI PC Optimizations
+
+- **Kokoro TTS** auto-detects `OpenVINOExecutionProvider` for Intel Arc GPUs
+- **Faster-Whisper** uses `auto` device selection (CUDA/CPU)
+- Zero-cloud architecture — everything stays on your machine
 
 ---
 
@@ -180,65 +247,38 @@ Add custom behavior in the Settings panel:
 
 | Problem | Solution |
 |---------|----------|
-| No audio output | Check browser permissions, speaker volume |
-| Microphone not working | Check browser mic permissions |
-| News not loading | Check internet connection, API key |
-| Slow responses | Ensure Docker has enough resources |
-| LLM timeout | Run `ollama pull llama3.2:1b` again |
-
-### Check Docker Services
-
-```bash
-docker ps
-# Should show: workshop-whisper, workshop-ollama, workshop-piper
-```
-
----
-
-## 🎓 Learning Outcomes
-
-After this session, you will understand:
-
-1. ✅ Voice AI pipeline architecture (STT → LLM → TTS)
-2. ✅ Pipecat framework for voice applications
-3. ✅ Real-time API integration with voice AI
-4. ✅ Building conversational voice agents
-5. ✅ Privacy benefits of local voice AI
-
----
-
-## 💡 Use Cases for Voice AI
-
-| Domain | Application |
-|--------|-------------|
-| **News & Media** | Personal news anchor, briefings |
-| **Accessibility** | Voice UI for visually impaired |
-| **Smart Home** | Voice-controlled assistants |
-| **Customer Service** | Voice support agents |
-| **Automotive** | In-car voice interfaces |
-| **Elderly Care** | Companion bots, reminders |
+| `500 Internal Server Error` | Make sure `ui/index_news.html` exists in the `ui/` folder |
+| No audio output | Check browser speaker permissions, try Chrome |
+| Microphone not detected | Allow microphone access in browser, check system settings |
+| News says "Syncing..." forever | Check internet connection; offline mode uses mock headlines |
+| Ollama not found | Install from [ollama.ai](https://ollama.ai/), run `ollama serve` |
+| Model not found | Run `ollama pull gemma3:4b` |
+| Slow first response | Kokoro TTS downloads ~300MB model on first run, subsequent runs are instant |
+| `onnxruntime` errors | Try `pip install onnxruntime` (CPU) or `pip install onnxruntime-openvino` (Intel) |
 
 ---
 
 ## 📚 Resources
 
-- [Pipecat Documentation](https://docs.pipecat.ai)
-- [Ollama Models](https://ollama.ai/library)
-- [Faster Whisper](https://github.com/SYSTRAN/faster-whisper)
-- [Piper TTS](https://github.com/rhasspy/piper)
-- [NewsAPI](https://newsapi.org/)
+- [Pipecat AI Documentation](https://docs.pipecat.ai)
+- [Ollama Models Library](https://ollama.ai/library)
+- [Faster-Whisper](https://github.com/SYSTRAN/faster-whisper)
+- [Kokoro TTS](https://huggingface.co/hexgrad/Kokoro-82M)
+- [Google News RSS](https://news.google.com/rss)
 
 ---
 
 ## 🤝 Credits
 
-Built for **India AI Summit 2025** Intel Workshop
+Built for **India AI Impact Summit 2026** — Intel AI Workshop, Session 5
 
-- **Framework**: Pipecat by Daily
-- **STT**: Faster Whisper
-- **LLM**: Ollama with Llama 3.2
-- **TTS**: Piper
-- **News**: NewsAPI.org
+| Role | Technology |
+|------|------------|
+| Pipeline Framework | [Pipecat AI](https://github.com/pipecat-ai/pipecat) by Daily |
+| Speech-to-Text | [Faster-Whisper](https://github.com/SYSTRAN/faster-whisper) |
+| Language Model | [Ollama](https://ollama.ai/) + Gemma 3 4B |
+| Text-to-Speech | [Kokoro TTS](https://huggingface.co/hexgrad/Kokoro-82M) |
+| News Data | Google News RSS |
 
 ---
 

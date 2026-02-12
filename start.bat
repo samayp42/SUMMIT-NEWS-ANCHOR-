@@ -11,7 +11,7 @@ echo.
 echo  ================================================================
 echo  =                                                              =
 echo  =   NEWS ANCHOR VOICE AI - ONE CLICK STARTUP                  =
-echo  =   India AI Summit 2025 - Session 5                          =
+echo  =   India AI Impact Summit 2026 - Session 5                          =
 echo  =                                                              =
 echo  =   [1] Ollama LLM    gemma3:4b       Terminal   Port 11434   =
 echo  =   [2] Whisper STT   tiny            Docker     Port 8000    =
@@ -42,14 +42,17 @@ echo.
 :: STEP 1: Ollama LLM (Native Terminal)
 :: ============================================================
 echo [1/4] Ollama LLM Server...
-tasklist /FI "IMAGENAME eq ollama.exe" 2>NUL | find /I /N "ollama.exe">NUL
-if "!ERRORLEVEL!"=="0" (
-    echo       Already running.
-) else (
-    echo       Starting Ollama...
-    start "Ollama LLM" cmd /k "title Ollama LLM - gemma3:4b && color 0A && ollama serve"
-    timeout /t 5 >nul
-)
+
+echo       Starting Ollama (GPU Mode)...
+taskkill /IM ollama.exe /F >nul 2>&1
+timeout /t 1 >nul
+
+REM Force GPU usage
+set OLLAMA_NUM_GPU=999
+set OLLAMA_KEEP_ALIVE=-1
+
+start "Ollama LLM" cmd /k "title Ollama LLM - GPU MODE && color 0A && set OLLAMA_NUM_GPU=999 && set OLLAMA_KEEP_ALIVE=-1 && ollama serve"
+timeout /t 5 >nul
 
 :: Check model
 echo       Checking gemma3:4b model...
@@ -64,41 +67,15 @@ if "!ERRORLEVEL!"=="0" (
 echo.
 
 :: ============================================================
-:: STEP 2: Whisper STT (Docker)
+:: STEP 2: Whisper STT (Local In-Process)
 :: ============================================================
-echo [2/4] Whisper STT Server (Docker)...
-
-:: Check if Docker is available
-docker info >nul 2>&1
-if "!ERRORLEVEL!" NEQ "0" (
-    echo       ERROR: Docker is not running!
-    echo       Please start Docker Desktop and try again.
-    pause
-    exit /b 1
-)
-
-:: Remove old container if exists, start fresh
-docker rm -f workshop-whisper >nul 2>&1
-
-echo       Starting Whisper container...
-docker run -d --name workshop-whisper -p 8000:8000 ^
-    -e "WHISPER__MODEL=tiny" ^
-    -e "WHISPER__INFERENCE_DEVICE=cpu" ^
-    -e "WHISPER__COMPUTE_TYPE=int8" ^
-    -e "WHISPER__MODEL_TTL=-1" ^
-    fedirz/faster-whisper-server:latest-cpu >nul 2>&1
-
-if "!ERRORLEVEL!"=="0" (
-    echo       Whisper container started on port 8000.
-) else (
-    echo       Whisper may already be running, checking...
-)
-
-:: Wait for Whisper to be ready
-echo       Waiting for Whisper to load model...
-timeout /t 10 >nul
-echo       Whisper STT ready.
+echo [2/4] Whisper STT (Local In-Process)...
+echo       Using 'tiny' model for high speed.
 echo.
+
+:: ============================================================
+:: STEP 3: Kokoro TTS (In-Process)
+:: ============================================================
 
 :: ============================================================
 :: STEP 3: Kokoro TTS (In-Process)

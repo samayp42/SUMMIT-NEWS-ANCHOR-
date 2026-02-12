@@ -1,6 +1,6 @@
 /**
  * News Anchor Voice AI Controller
- * India AI Summit 2025 - Session 5
+ * India AI Impact Summit 2026 - Session 5
  */
 
 class NewsAnchorApp {

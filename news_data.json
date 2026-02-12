@@ -1,25 +1,37 @@
 {
   "headlines": [
     {
-      "title": "India AI Summit 2025 Kicks Off with Record Attendance",
-      "description": "The annual India AI Summit has begun with over 10,000 attendees exploring the latest in artificial intelligence.",
-      "source": "Tech Today India",
-      "published": "2 hours ago"
+      "title": "US firm eyes Bengal startup JVs for AI-led transformation",
+      "description": "US firm eyes Bengal startup JVs for AI-led transformation",
+      "source": "Times of India",
+      "published": "Thu, 12 Feb 2026 04:17:00 GMT"
     },
     {
-      "title": "Intel Launches New AI PC Chips Optimized for Local LLMs",
-      "description": "Intel's latest Core Ultra processors enable running large language models entirely on personal computers.",
-      "source": "Hardware Weekly",
-      "published": "4 hours ago"
+      "title": "India can build world-class AI at home; reap healthcare, agriculture gains: Google DeepMind\u2019s Pushmeet...",
+      "description": "India can build world-class AI at home; reap healthcare, agriculture gains: Google DeepMind\u2019s Pushmeet...",
+      "source": "Moneycontrol",
+      "published": "Thu, 12 Feb 2026 06:35:22 GMT"
     },
     {
-      "title": "Renewable Energy Investments Hit All-Time High",
-      "description": "Global investments in solar and wind energy have reached unprecedented levels.",
-      "source": "Climate Monitor",
-      "published": "6 hours ago"
+      "title": "India has changed its startup rules for deep tech",
+      "description": "India has changed its startup rules for deep tech",
+      "source": "TechCrunch",
+      "published": "Sun, 08 Feb 2026 03:30:00 GMT"
+    },
+    {
+      "title": "Oil India advances deepwater exploration and biofuel innovation",
+      "description": "Oil India advances deepwater exploration and biofuel innovation",
+      "source": "Energy Connects",
+      "published": "Thu, 12 Feb 2026 06:05:53 GMT"
+    },
+    {
+      "title": "Kaynes Technology India Ltd Sees High Value Trading Amid Sector Underperformance",
+      "description": "Kaynes Technology India Ltd Sees High Value Trading Amid Sector Underperformance",
+      "source": "Markets Mojo",
+      "published": "Thu, 12 Feb 2026 05:49:21 GMT"
     }
   ],
-  "_updated": "2026-02-10T23:53:41.099900",
+  "_updated": "2026-02-12T12:40:41.767545",
   "entertainment": [
     {
       "title": "Bollywood Film Breaks Box Office Records",
@@ -58,6 +70,102 @@
       "description": "New data suggests some environmental protection measures are showing results.",
       "source": "Environment Today",
       "published": "5 hours ago"
+    }
+  ],
+  "technology": [
+    {
+      "title": "80% of India's startups are AI-led: India's IT Minister",
+      "description": "80% of India's startups are AI-led: India's IT Minister",
+      "source": "ANI News",
+      "published": "Fri, 16 Jan 2026 08:00:00 GMT"
+    },
+    {
+      "title": "AI will power the next wave of India\u2019s tech startup evolution: National Startup Day",
+      "description": "AI will power the next wave of India\u2019s tech startup evolution: National Startup Day",
+      "source": "Indiatimes",
+      "published": "Fri, 16 Jan 2026 03:30:00 GMT"
+    },
+    {
+      "title": "How Can Indian AI Startups Access Global VC Funds?",
+      "description": "How Can Indian AI Startups Access Global VC Funds?",
+      "source": "sify.com",
+      "published": "Wed, 19 Nov 2025 08:00:00 GMT"
+    },
+    {
+      "title": "\u2018Half of India\u2019s next wave of unicorns will be AI companies\u2019: Google exec Seema Rao at AI Startups Conclave",
+      "description": "\u2018Half of India\u2019s next wave of unicorns will be AI companies\u2019: Google exec Seema Rao at AI Startups Conclave",
+      "source": "The Indian Express",
+      "published": "Sun, 18 Jan 2026 08:00:00 GMT"
+    },
+    {
+      "title": "State of AI startups: An India story",
+      "description": "State of AI startups: An India story",
+      "source": "orfonline.org",
+      "published": "Sat, 03 May 2025 07:00:00 GMT"
+    }
+  ],
+  "business": [
+    {
+      "title": "Decade of the Startup India Initiative",
+      "description": "Decade of the Startup India Initiative",
+      "source": "Drishti IAS",
+      "published": "Sat, 17 Jan 2026 08:00:00 GMT"
+    },
+    {
+      "title": "Reclaiming Innovation: Financing India\u2019s Startup Future from Within",
+      "description": "Reclaiming Innovation: Financing India\u2019s Startup Future from Within",
+      "source": "orfonline.org",
+      "published": "Thu, 23 Oct 2025 07:00:00 GMT"
+    },
+    {
+      "title": "Is India\u2019s $700-billion startup market moving from hype to execution?",
+      "description": "Is India\u2019s $700-billion startup market moving from hype to execution?",
+      "source": "Exchange4Media",
+      "published": "Tue, 20 Jan 2026 08:00:00 GMT"
+    },
+    {
+      "title": "India's Startup Funding Set for 2026 Rebound: Will Investors Re-Open Wallets? What Experts Predict!",
+      "description": "India's Startup Funding Set for 2026 Rebound: Will Investors Re-Open Wallets? What Experts Predict!",
+      "source": "Whalesbook",
+      "published": "Wed, 31 Dec 2025 08:00:00 GMT"
+    },
+    {
+      "title": "Mobilising Domestic Capital Crucial To Power India\u2019s Startup Growth Amid Foreign Reliance",
+      "description": "Mobilising Domestic Capital Crucial To Power India\u2019s Startup Growth Amid Foreign Reliance",
+      "source": "BW Disrupt",
+      "published": "Thu, 02 Oct 2025 07:00:00 GMT"
+    }
+  ],
+  "sports": [
+    {
+      "title": "India's Asia Cup 2025 Squad If Only IPL 2025 Performances Were Considered - See Full List",
+      "description": "India's Asia Cup 2025 Squad If Only IPL 2025 Performances Were Considered - See Full List",
+      "source": "NDTV Sports",
+      "published": "Thu, 21 Aug 2025 07:00:00 GMT"
+    },
+    {
+      "title": "Auqib Nabi Dar: Meet Jammu & Kashmir pacer sold to Delhi Capitals for Rs 8.4 crore at IPL Auction",
+      "description": "Auqib Nabi Dar: Meet Jammu & Kashmir pacer sold to Delhi Capitals for Rs 8.4 crore at IPL Auction",
+      "source": "Times of India",
+      "published": "Tue, 16 Dec 2025 08:00:00 GMT"
+    },
+    {
+      "title": "Asia Cup squad: 'His case needs to be discussed' - Ex-India cricketer slams Harshit Rana's selection",
+      "description": "Asia Cup squad: 'His case needs to be discussed' - Ex-India cricketer slams Harshit Rana's selection",
+      "source": "Times of India",
+      "published": "Thu, 21 Aug 2025 07:00:00 GMT"
+    },
+    {
+      "title": "IPL 2025 Closing Ceremony: Shankar Mahadevan, artists honour Indian Armed Forces - watch",
+      "description": "IPL 2025 Closing Ceremony: Shankar Mahadevan, artists honour Indian Armed Forces - watch",
+      "source": "Times of India",
+      "published": "Tue, 03 Jun 2025 07:00:00 GMT"
+    },
+    {
+      "title": "BCCI to honour Indian Armed forces during IPL 2025 closing ceremony",
+      "description": "BCCI to honour Indian Armed forces during IPL 2025 closing ceremony",
+      "source": "Times of India",
+      "published": "Tue, 27 May 2025 07:00:00 GMT"
     }
   ]
 }

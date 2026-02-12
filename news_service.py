@@ -237,25 +237,28 @@ async def fetch_live_news(category: str = "headlines", country: str = "in") -> L
 
 
 async def fetch_rss_news(category: str, country: str = "IN") -> List[Dict[str, Any]]:
-    """Fetch news from Google News RSS."""
+    """Fetch news from Google News RSS using search-based queries to avoid controversial content."""
+    import urllib.parse
     country_code = country.upper()
     lang = "en"
     
-    # Google News RSS URLs
+    # Google News RSS - use SEARCH queries for safe, constructive content
     base_url = "https://news.google.com/rss"
     query_params = f"hl={lang}-{country_code}&gl={country_code}&ceid={country_code}:{lang}"
     
-    topic_map = {
-        "headlines": f"{base_url}?{query_params}",
-        "technology": f"{base_url}/headlines/section/topic/TECHNOLOGY?{query_params}",
-        "business": f"{base_url}/headlines/section/topic/BUSINESS?{query_params}",
-        "sports": f"{base_url}/headlines/section/topic/SPORTS?{query_params}",
-        "entertainment": f"{base_url}/headlines/section/topic/ENTERTAINMENT?{query_params}",
-        "science": f"{base_url}/headlines/section/topic/SCIENCE?{query_params}",
-        "world": f"{base_url}/headlines/section/topic/WORLD?{query_params}"
+    # Search-based topics to avoid political/controversial headlines
+    search_queries = {
+        "headlines": "technology OR innovation OR science OR startup India",
+        "technology": "AI artificial intelligence technology startup India",
+        "business": "startup funding investment economy growth India",
+        "sports": "cricket IPL sports India performance",
+        "entertainment": "entertainment Bollywood music OTT India",
+        "science": "space ISRO science research discovery India",
+        "world": "technology innovation climate summit global"
     }
     
-    url = topic_map.get(category, topic_map["headlines"])
+    query = search_queries.get(category, search_queries["headlines"])
+    url = f"{base_url}/search?q={urllib.parse.quote(query)}&{query_params}"
     
     logger.debug(f"Fetching RSS: {url}")
     
@@ -312,13 +315,18 @@ def get_current_news_sync(category: str = "headlines") -> List[Dict[str, Any]]:
     Synchronous version - returns cached/mock news.
     For async fetching, use fetch_live_news().
     """
-    # Try to read from cache first
+    # Try to read from cache first (but only if fresh — within 30 min)
     try:
         if os.path.exists(NEWS_CACHE_FILE):
-            with open(NEWS_CACHE_FILE, 'r') as f:
-                cached = json.load(f)
-                if category in cached:
-                    return cached[category]
+            # Check file age
+            file_age = datetime.now().timestamp() - os.path.getmtime(NEWS_CACHE_FILE)
+            if file_age < 1800:  # 30 minutes
+                with open(NEWS_CACHE_FILE, 'r') as f:
+                    cached = json.load(f)
+                    if category in cached:
+                        return cached[category]
+            else:
+                logger.info(f"🗑️ News cache is {int(file_age/60)}min old, skipping stale data")
     except:
         pass
     
@@ -371,44 +379,33 @@ def format_news_for_speech(articles: List[Dict[str, Any]], category: str = "head
 
 def create_news_context_prompt(category: str = "headlines") -> str:
     """
-    Creates a formatted context string for injection into the LLM prompt.
-    This connects live news data to AI reasoning.
-    
-    Args:
-        category: News category to fetch
-        
-    Returns:
-        Formatted string with current news data
+    Creates a MINIMAL context string for the LLM. 
+    optimized for speed and to prevent reading metadata.
     """
     articles = get_current_news_sync(category)
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
     
     news_text = ""
     for i, article in enumerate(articles, 1):
-        news_text += f"""
-STORY {i}:
-  Title: {article.get('title', 'N/A')}
-  Summary: {article.get('description', 'N/A')}
-  Source: {article.get('source', 'Unknown')}
-  Time: {article.get('published', 'Recent')}
-"""
+        # clean title - remove source suffix if present like " - Times of India"
+        title = article.get('title', 'N/A').split(' - ')[0]
+        source = article.get('source', 'Unknown')
+        
+        # Only Title and Source. No description or time to confuse the LLM.
+        news_text += f"[{i}] {title} (Source: {source})\n"
     
     return f"""
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📰 REAL-TIME NEWS DATA
+📰 LIVE NEWS FEED - {category.upper()}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-🕐 Last Updated: {timestamp}
-📂 Category: {category.upper()}
 
 {news_text}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Use this real-time news data when answering questions.
-When reporting news, cite the source name.
-Summarize headlines naturally, don't read verbatim.
-Offer to provide more details on specific stories.
+INSTRUCTIONS:
+1. Pick 1-2 most interesting stories from above.
+2. SUMMARIZE them in your own words.
+3. NEVER read the dates, times, or 'URL'.
+4. Keep it under 3 sentences.
 """
 
 

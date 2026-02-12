@@ -1,7 +1,7 @@
 """
 News Anchor Voice AI Agent
 ===========================
-India AI Summit 2025 - Session 5: Pipecat Voice AI
+India AI Impact Summit 2026 - Session 5: Pipecat Voice AI
 
 A real-time voice AI news reporter that:
 - Listens to your spoken questions (Whisper STT)
@@ -119,16 +119,16 @@ except ImportError:
     logger.warning("ONNX Runtime not found")
 
 class FlexibleKokoroTTSService(KokoroTTSService):
-    """Kokoro TTS with device selection support."""
-    def __init__(self, device: str = None, **kwargs):
+    """Kokoro TTS with device selection and local model support."""
+    def __init__(self, device: str = None, repo_id: str = "hexgrad/Kokoro-82M", **kwargs):
         super().__init__(**kwargs)
-        if device:
-             logger.info(f"🔄 Re-initializing Kokoro pipeline on device: {device}")
+        if device or repo_id:
+             logger.info(f"🔄 Re-initializing Kokoro pipeline on device: {device} | Repo: {repo_id}")
              try:
                  from kokoro import KPipeline
-                 self._pipeline = KPipeline(lang_code=self._lang_code, repo_id="hexgrad/Kokoro-82M", device=device)
+                 self._pipeline = KPipeline(lang_code=self._lang_code, repo_id=repo_id, device=device)
              except Exception as e:
-                 logger.error(f"Failed to use device {device}: {e}")
+                 logger.error(f"Failed to init Kokoro pipeline: {e}")
 
 # Load environment variables
 load_dotenv()
@@ -239,9 +239,15 @@ MISSION:
 - Get STRAIGHT to the headline.
 - Maximum 2-3 sentences per update.
 - Use active voice. Be punchy.
+- NEVER READ DATES, TIMES, OR URLS. (e.g. "Fri, 16 Jan 2026").
+- Summarize the story, don't read the headline verbatim.
+- "According to [Source]..." is good.
 
 STYLE:
-- Crisp. Professional. Urgent.
+- Crisp.
+- Deliver news with speed and accuracy.
+- Use SHORT, PUNCHY SENTENCES. Avoid complex clauses.
+- Pause frequently (use periods).
 - Like a breaking news ticker tape spoken aloud.
 - If user asks a question, answer immediately with facts.
 """
@@ -311,46 +317,40 @@ async def run_bot_impl(connection):
         )
     )
 
-    # Speech-to-Text (Local Faster-Whisper - High Speed)
-    # Uses 'base' model which is ~7x faster than large
+    # Speech-to-Text (Local Faster-Whisper)
+    # Using 'tiny' for maximum speed and responsiveness
     stt = WhisperSTTService(
-        model="base",
-        device="auto", # Automatically uses CUDA if available
+        model="tiny",
+        device="auto", 
         no_speech_prob=0.4
     )
     
-    # LLM (Ollama local)
+    # ... (LLM setup remains same) ...
+    # LLM (Ollama local) — streaming enabled for sentence-by-sentence TTS
     llm = OLLamaLLMService(
         model=os.getenv("LLM_MODEL", "gemma3:4b"),
-        base_url=os.getenv("OLLAMA_URL", "http://localhost:11434/v1")
+        base_url=os.getenv("OLLAMA_URL", "http://localhost:11434/v1"),
+        params=OLLamaLLMService.InputParams(
+            temperature=Config.llm_params.get("temperature", 0.3),
+            max_tokens=Config.llm_params.get("max_tokens", 100),
+        )
     )
 
     # Text-to-Speech (Kokoro - Local 82M Model)
-    # The model will download automatically on first run (~300MB)
-    # Try to detect GPU
-    device = "cpu"
-    try:
-        import onnxruntime as ort
-        providers = ort.get_available_providers()
-        if "CUDAExecutionProvider" in providers:
-            device = "cuda"
-            logger.info("🟢 Using High-Performance GPU (CUDA) for Kokoro TTS!")
-        elif "OpenVINOExecutionProvider" in providers:
-            device = None  # Use default provider (OpenVINO)
-            logger.info("🟢 Using Intel Arc / OpenVINO for AI Speed! (Kokoro TTS)")
-        elif "DmlExecutionProvider" in providers:
-            device = None  # DirectML often works on Arc too if OpenVINO fails
-            logger.info("🟢 Using DirectML GPU Acceleration")
-    except ImportError:
-        pass
-
-    tts = FlexibleKokoroTTSService(
-        voice_id="af_heart",  # "af_heart" is a popular high-quality voice
-        device=device
+    # Using standard service - it handles caching automatically
+    tts = KokoroTTSService(
+        voice_id="af_heart", 
     )
 
-    # VAD Analyzer (Tuned for 400ms silence detection)
-    vad_analyzer = SileroVADAnalyzer(params=VADParams(stop_secs=0.4))
+    # VAD Analyzer (Optimized for fast cut-off)
+    # min_volume=0.2 avoids recording background noise as speech
+    # stop_secs=0.3 ensures it stops listening quickly when you finish
+    vad_analyzer = SileroVADAnalyzer(params=VADParams(
+        stop_secs=0.3,
+        start_secs=0.05,
+        confidence=0.4,
+        min_volume=0.2
+    ))
     vad = VADProcessor(vad_analyzer=vad_analyzer)
 
     # Context with initial system prompt
@@ -364,6 +364,7 @@ async def run_bot_impl(connection):
     rtvi = RTVIProcessor(config=RTVIConfig(config=[]))
     
     # Sentence aggregator for smooth TTS
+    # Splits on punctuation to stream audio sentence-by-sentence
     sentence_aggregator = SentenceAggregator()
 
     runner = PipelineRunner()
@@ -458,16 +459,32 @@ async def update_config(request: Request):
 
 @app.get("/api/news")
 async def get_news(category: str = "headlines"):
-    """Get news for a category."""
+    """Get news for a category — always tries fresh fetch first."""
+    articles = []
+    source = "mock"
+    
     if Config.features.get("live_news"):
-        articles = await fetch_live_news(category)
-    else:
+        try:
+            articles = await fetch_live_news(category)
+            if articles:
+                source = "live"
+                # Update cache for future use
+                await update_news_cache(category)
+                Config.last_news_update = datetime.now()
+        except Exception as e:
+            logger.warning(f"Live news fetch failed: {e}")
+    
+    if not articles:
         articles = get_current_news_sync(category)
+        source = "cache/mock"
+    
+    logger.info(f"📰 Serving {len(articles)} articles [{source}] for '{category}'")
     
     return {
         "category": category,
         "articles": articles,
-        "timestamp": datetime.now().isoformat()
+        "timestamp": datetime.now().isoformat(),
+        "source": source
     }
 
 
@@ -521,7 +538,7 @@ if __name__ == "__main__":
     ╔═══════════════════════════════════════════════════════════╗
     ║                                                           ║
     ║   📰 NEWS ANCHOR VOICE AI                                 ║
-    ║   India AI Summit 2025 - Session 5                        ║
+    ║   India AI Impact Summit 2026 - Session 5                        ║
     ║                                                           ║
     ║   Open: http://localhost:{port}/                          ║
     ║                                                           ║

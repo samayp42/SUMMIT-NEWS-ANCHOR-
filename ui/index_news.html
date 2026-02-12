@@ -4,85 +4,812 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AirOwl News Anchor</title>
-    <link rel="stylesheet" href="ui/styles.css">
+    <title>NewsBot Studio — AI News Anchor</title>
+    <meta name="description" content="AI-powered News Anchor Studio with real-time voice broadcasting">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
     <script src="ui/rtvi-client.js"></script>
     <script src="ui/app_news.js" defer></script>
-
     <style>
-        /* News Anchor Specific Styles (Inlined for reliability) */
+        /* =============================================
+           NEWSBOT STUDIO — Apple-Inspired Light Theme
+           Clean. Minimal. Premium.
+           ============================================= */
 
-        /* Layout Tweaks */
-        .news-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 24px;
+        :root {
+            --bg: #f5f5f7;
+            --bg-pure: #ffffff;
+            --bg-elevated: #ffffff;
+            --bg-secondary: #f2f2f7;
+            --bg-tertiary: #e8e8ed;
+
+            --text-primary: #1d1d1f;
+            --text-secondary: #6e6e73;
+            --text-tertiary: #aeaeb2;
+            --text-caption: #c7c7cc;
+
+            --accent: #0071e3;
+            --accent-hover: #0077ED;
+            --accent-light: rgba(0, 113, 227, 0.08);
+            --accent-medium: rgba(0, 113, 227, 0.12);
+            --red: #ff3b30;
+            --green: #34c759;
+            --orange: #ff9500;
+            --purple: #af52de;
+
+            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
+            --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.06), 0 2px 6px rgba(0, 0, 0, 0.03);
+            --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.08), 0 4px 12px rgba(0, 0, 0, 0.04);
+            --shadow-float: 0 20px 60px rgba(0, 0, 0, 0.1), 0 8px 20px rgba(0, 0, 0, 0.05);
+
+            --border: rgba(0, 0, 0, 0.06);
+            --border-strong: rgba(0, 0, 0, 0.1);
+
+            --radius: 14px;
+            --radius-sm: 10px;
+            --radius-lg: 20px;
+            --radius-xl: 28px;
+
+            --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         }
 
-        .news-timestamp {
-            font-size: 0.8rem;
-            color: var(--text-muted);
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text-primary);
+            font-family: var(--font);
+            height: 100vh;
+            overflow: hidden;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        /* ============ LAYOUT ============ */
+        .studio-container {
+            display: flex;
+            height: 100vh;
+            gap: 0;
+        }
+
+        /* ============ LEFT: SIDEBAR ============ */
+        .control-panel {
+            width: 240px;
+            background: var(--bg-pure);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            padding: 24px 16px;
+            gap: 4px;
+            flex-shrink: 0;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 4px 10px;
+            margin-bottom: 28px;
+        }
+
+        .brand-logo {
+            width: 36px;
+            height: 36px;
+            background: var(--accent);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 1rem;
+            color: white;
+        }
+
+        .brand-name {
+            font-weight: 700;
+            font-size: 1rem;
+            color: var(--text-primary);
+            letter-spacing: -0.3px;
+            line-height: 1.2;
+        }
+
+        .brand-name span {
+            display: block;
+            font-size: 0.6rem;
+            font-weight: 500;
+            color: var(--text-tertiary);
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+        }
+
+        /* Nav Items */
+        .nav-item {
+            background: transparent;
+            border: none;
+            padding: 10px 12px;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-weight: 500;
+            color: var(--text-secondary);
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.88rem;
+            text-align: left;
+            width: 100%;
+            font-family: var(--font);
+        }
+
+        .nav-item:hover {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+        }
+
+        .nav-item.active {
+            background: var(--accent-light);
+            color: var(--accent);
             font-weight: 600;
         }
 
-        /* Dashboard Grid Override for News */
-        .dashboard-grid {
-            display: grid;
-            grid-template-columns: 1fr 340px;
-            gap: 24px;
-            display: flex !important;
-            /* Fallback/Override flex if needed */
+        .nav-icon {
+            font-size: 1rem;
+            width: 20px;
+            text-align: center;
         }
 
-        /* News Feed Panel (Right Side) */
-        .news-feed-panel {
-            background: var(--bg-app);
-            border-radius: var(--radius-md);
-            padding: 20px;
+        .nav-spacer {
+            flex: 1;
+        }
+
+        /* Status */
+        .connection-status {
+            background: var(--bg-secondary);
+            padding: 10px 14px;
+            border-radius: var(--radius-sm);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--text-caption);
+            flex-shrink: 0;
+            transition: all 0.3s;
+        }
+
+        .status-text {
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--text-tertiary);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .connection-status.connected .status-indicator {
+            background: var(--green);
+            box-shadow: 0 0 8px rgba(52, 199, 89, 0.5);
+            animation: pulse-dot 2s infinite;
+        }
+
+        .connection-status.connected .status-text {
+            color: var(--green);
+        }
+
+        .connection-status.connecting .status-indicator {
+            background: var(--orange);
+            animation: pulse-dot 0.8s infinite;
+        }
+
+        .connection-status.connecting .status-text {
+            color: var(--orange);
+        }
+
+        @keyframes pulse-dot {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.3;
+            }
+        }
+
+        /* Buttons */
+        .go-live-btn {
+            width: 100%;
+            padding: 13px;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: var(--radius);
+            font-weight: 600;
+            font-size: 0.88rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: var(--font);
+        }
+
+        .go-live-btn:hover {
+            background: var(--accent-hover);
+            transform: scale(1.01);
+        }
+
+        .go-live-btn:active {
+            transform: scale(0.98);
+        }
+
+        .end-btn {
+            width: 100%;
+            padding: 13px;
+            background: rgba(255, 59, 48, 0.08);
+            color: var(--red);
+            border: none;
+            border-radius: var(--radius);
+            font-weight: 600;
+            font-size: 0.88rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: var(--font);
+        }
+
+        .end-btn:hover {
+            background: rgba(255, 59, 48, 0.14);
+        }
+
+        /* ============ CENTER: STAGE ============ */
+        .broadcast-stage {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .view-panel {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.35s ease;
+        }
+
+        .view-panel.active {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .stage-layout {
+            display: flex;
+            flex-direction: column;
+            height: calc(100% - 44px);
+        }
+
+        /* ====== ANCHOR STAGE ====== */
+        .anchor-stage {
+            flex: 0 0 46%;
+            background: var(--bg-pure);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            border-bottom: 1px solid var(--border);
+        }
+
+        /* ON AIR */
+        .on-air-badge {
+            position: absolute;
+            top: 20px;
+            left: 24px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.65rem;
+            font-weight: 700;
+            color: var(--text-caption);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            padding: 5px 14px;
+            border-radius: 100px;
+            background: var(--bg-secondary);
+            transition: all 0.3s;
+        }
+
+        .on-air-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--text-caption);
+            display: inline-block;
+        }
+
+        .on-air-badge.live {
+            color: var(--red);
+            background: rgba(255, 59, 48, 0.08);
+        }
+
+        .on-air-badge.live .on-air-dot {
+            background: var(--red);
+            box-shadow: 0 0 6px var(--red);
+            animation: pulse-dot 1.5s infinite;
+        }
+
+        /* ====== AI ORB ====== */
+        .anchor-orb-container {
+            position: relative;
+            width: 180px;
+            height: 180px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .anchor-orb {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: linear-gradient(145deg, #74b9ff, var(--accent), #a29bfe);
+            background-size: 200% 200%;
+            animation: orb-shift 6s ease-in-out infinite;
+            box-shadow:
+                0 8px 32px rgba(0, 113, 227, 0.2),
+                0 2px 8px rgba(0, 113, 227, 0.1);
+            position: relative;
+            z-index: 2;
+        }
+
+        .anchor-orb::after {
+            content: '';
+            position: absolute;
+            top: 16%;
+            left: 22%;
+            width: 20px;
+            height: 10px;
+            background: rgba(255, 255, 255, 0.4);
+            border-radius: 50%;
+            filter: blur(4px);
+        }
+
+        .orb-ring {
+            position: absolute;
+            border: 1.5px solid rgba(0, 113, 227, 0.08);
+            border-radius: 50%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .ring-1 {
+            width: 110px;
+            height: 110px;
+            animation: ring-pulse 4s ease-out infinite;
+        }
+
+        .ring-2 {
+            width: 135px;
+            height: 135px;
+            animation: ring-pulse 4s ease-out infinite 0.7s;
+        }
+
+        .ring-3 {
+            width: 160px;
+            height: 160px;
+            animation: ring-pulse 4s ease-out infinite 1.4s;
+        }
+
+        @keyframes orb-shift {
+
+            0%,
+            100% {
+                background-position: 0% 50%;
+            }
+
+            50% {
+                background-position: 100% 50%;
+            }
+        }
+
+        @keyframes ring-pulse {
+            0% {
+                opacity: 0.6;
+                transform: translate(-50%, -50%) scale(0.88);
+            }
+
+            100% {
+                opacity: 0;
+                transform: translate(-50%, -50%) scale(1.15);
+            }
+        }
+
+        /* SPEAKING */
+        #anchorContainer.speaking .anchor-orb {
+            background: linear-gradient(145deg, #e0aaff, var(--purple), #7b68ee);
+            background-size: 200% 200%;
+            box-shadow:
+                0 8px 40px rgba(175, 82, 222, 0.25),
+                0 2px 12px rgba(175, 82, 222, 0.12);
+            animation: orb-speak 1.2s ease-in-out infinite;
+        }
+
+        #anchorContainer.speaking .orb-ring {
+            border-color: rgba(175, 82, 222, 0.1);
+            animation-duration: 2.2s;
+        }
+
+        @keyframes orb-speak {
+
+            0%,
+            100% {
+                transform: scale(1);
+            }
+
+            30% {
+                transform: scale(1.1);
+            }
+
+            70% {
+                transform: scale(0.96);
+            }
+        }
+
+        /* Waveform */
+        .waveform {
+            display: flex;
+            gap: 3px;
+            align-items: center;
+            height: 36px;
+            margin-top: 20px;
+            z-index: 2;
+        }
+
+        .wave-bar {
+            width: 3px;
+            height: 3px;
+            background: var(--accent);
+            border-radius: 2px;
+            opacity: 0.25;
+            animation: wave var(--speed, 0.5s) ease-in-out infinite alternate;
+        }
+
+        #anchorContainer.speaking~.waveform .wave-bar {
+            opacity: 0.6;
+        }
+
+        @keyframes wave {
+            from {
+                height: 3px;
+            }
+
+            to {
+                height: var(--max-h, 20px);
+            }
+        }
+
+        .anchor-status {
+            margin-top: 14px;
+            font-size: 0.65rem;
+            font-weight: 600;
+            color: var(--text-caption);
+            letter-spacing: 2.5px;
+            text-transform: uppercase;
+            z-index: 2;
+        }
+
+        /* ====== TRANSCRIPT ====== */
+        .transcript-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: var(--bg);
+            overflow: hidden;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 24px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: var(--text-tertiary);
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            border-bottom: 1px solid var(--border);
+            background: var(--bg-pure);
+            flex-shrink: 0;
+        }
+
+        .live-tag {
+            font-size: 0.6rem;
+            color: var(--red);
+            letter-spacing: 1px;
+            animation: pulse-dot 2s infinite;
+        }
+
+        .transcript-feed {
+            flex: 1;
             overflow-y: auto;
-            max-height: 100%;
+            padding: 20px 24px;
+        }
+
+        .transcript-feed::-webkit-scrollbar,
+        .headlines-feed::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .transcript-feed::-webkit-scrollbar-thumb,
+        .headlines-feed::-webkit-scrollbar-thumb {
+            background: var(--bg-tertiary);
+            border-radius: 100px;
+        }
+
+        /* Bubbles */
+        .bubble {
+            max-width: 78%;
+            margin-bottom: 12px;
+            padding: 14px 18px;
+            border-radius: 18px;
+            font-size: 0.9rem;
+            line-height: 1.6;
+            animation: msg-in 0.25s ease-out;
+        }
+
+        @keyframes msg-in {
+            from {
+                opacity: 0;
+                transform: translateY(6px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .bubble.assistant {
+            background: var(--bg-pure);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+            border-bottom-left-radius: 6px;
+            margin-right: auto;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .bubble.user {
+            background: var(--accent);
+            color: white;
+            border-bottom-right-radius: 6px;
+            margin-left: auto;
+        }
+
+        .bubble.system {
+            background: transparent;
+            color: var(--text-tertiary);
+            font-size: 0.78rem;
+            padding: 6px 0;
+            max-width: 100%;
+            text-align: center;
+        }
+
+        .bubble-label {
+            font-size: 0.6rem;
+            font-weight: 700;
+            margin-bottom: 3px;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            display: block;
+            opacity: 0.4;
+        }
+
+        /* ====== TICKER ====== */
+        .ticker-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 44px;
+            background: var(--text-primary);
+            display: flex;
+            align-items: center;
+            overflow: hidden;
+            z-index: 10;
+        }
+
+        .ticker-label {
+            background: var(--red);
+            color: white;
+            font-weight: 800;
+            padding: 0 18px;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            font-size: 0.65rem;
+            letter-spacing: 2px;
+            z-index: 1;
+            flex-shrink: 0;
+        }
+
+        .ticker-track {
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .ticker-content {
+            display: inline-block;
+            white-space: nowrap;
+            color: rgba(255, 255, 255, 0.8);
+            font-weight: 500;
+            font-size: 0.8rem;
+            animation: scroll-ticker 40s linear infinite;
+            padding-left: 100%;
+            letter-spacing: 0.2px;
+        }
+
+        @keyframes scroll-ticker {
+            from {
+                transform: translateX(0);
+            }
+
+            to {
+                transform: translateX(-100%);
+            }
+        }
+
+        /* ============ RIGHT: WIRE PANEL ============ */
+        .wire-panel {
+            width: 320px;
+            background: var(--bg-pure);
+            border-left: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+        }
+
+        .wire-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 20px 12px;
+        }
+
+        .wire-title {
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: var(--text-tertiary);
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .wire-icon {
+            font-size: 0.85rem;
+        }
+
+        .refresh-btn {
+            width: 30px;
+            height: 30px;
+            background: var(--bg-secondary);
+            border: none;
+            border-radius: var(--radius-sm);
+            color: var(--text-tertiary);
+            font-size: 1rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .refresh-btn:hover {
+            background: var(--bg-tertiary);
+            color: var(--accent);
+            transform: rotate(90deg);
+        }
+
+        /* Categories */
+        .category-rack {
+            display: flex;
+            gap: 6px;
+            padding: 0 20px 14px;
+        }
+
+        .category-btn {
+            background: var(--bg-secondary);
+            border: none;
+            padding: 6px 14px;
+            border-radius: 100px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: var(--font);
+            letter-spacing: 0.3px;
+        }
+
+        .category-btn:hover {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .category-btn.active {
+            background: var(--text-primary);
+            color: white;
+        }
+
+        .wire-timestamp {
+            font-size: 0.6rem;
+            color: var(--text-caption);
+            padding: 0 20px 12px;
+            letter-spacing: 0.3px;
+        }
+
+        /* Headlines */
+        .headlines-feed {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0 16px 16px;
         }
 
         .headline-item {
-            background: white;
-            padding: 16px;
+            padding: 14px 16px;
             border-radius: var(--radius-sm);
-            margin-bottom: 12px;
-            border-left: 4px solid var(--primary);
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
-            transition: transform 0.2s;
+            background: var(--bg);
+            margin-bottom: 8px;
+            position: relative;
+            cursor: default;
+            transition: all 0.2s ease;
+            border: 1px solid transparent;
         }
 
         .headline-item:hover {
-            transform: translateX(4px);
+            background: var(--bg-secondary);
+            border-color: var(--border);
+        }
+
+        .headline-item.loading {
+            opacity: 0.4;
         }
 
         .headline-num {
-            font-weight: 900;
-            color: var(--primary);
-            opacity: 0.2;
-            font-size: 1.5rem;
-            float: right;
+            position: absolute;
+            top: 10px;
+            right: 14px;
+            font-size: 1.4rem;
+            font-weight: 800;
+            color: rgba(0, 0, 0, 0.04);
             line-height: 1;
         }
 
         .headline-text {
-            font-family: var(--font-heading);
-            font-weight: 700;
-            color: var(--text-main);
             display: block;
+            font-weight: 600;
+            color: var(--text-primary);
+            font-size: 0.82rem;
+            line-height: 1.5;
             margin-bottom: 6px;
-            font-size: 0.95rem;
-            line-height: 1.4;
+            padding-right: 24px;
         }
 
         .headline-source {
-            font-size: 0.7rem;
-            color: var(--text-muted);
+            font-size: 0.6rem;
+            color: var(--text-tertiary);
             text-transform: uppercase;
-            font-weight: 700;
-            letter-spacing: 0.5px;
+            font-weight: 600;
+            letter-spacing: 0.8px;
             display: flex;
             align-items: center;
             gap: 6px;
@@ -90,104 +817,214 @@
 
         .headline-source::before {
             content: '';
-            display: block;
-            width: 6px;
-            height: 6px;
-            background: var(--warning);
+            width: 5px;
+            height: 5px;
+            background: var(--accent);
             border-radius: 50%;
+            display: inline-block;
+            flex-shrink: 0;
         }
 
-        /* Category Tags */
-        .category-rack {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-            margin-bottom: 20px;
+        /* Metrics */
+        .metrics-bar {
+            border-top: 1px solid var(--border);
+            padding: 16px 20px;
+            flex-shrink: 0;
         }
 
-        .category-btn {
-            background: white;
-            border: 1px solid rgba(0, 0, 0, 0.05);
-            padding: 8px 16px;
-            border-radius: 100px;
-            font-size: 0.8rem;
+        .metric-title {
+            font-size: 0.6rem;
             font-weight: 700;
-            color: var(--text-body);
-            cursor: pointer;
-            transition: all 0.2s;
-            font-family: var(--font-heading);
+            color: var(--text-caption);
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            margin-bottom: 10px;
         }
 
-        .category-btn:hover {
-            background: var(--bg-app);
-            color: var(--primary);
-            transform: translateY(-1px);
+        .metric-item {
+            display: flex;
+            align-items: center;
+            padding: 5px 0;
         }
 
-        .category-btn.active {
-            background: var(--text-main);
-            color: white;
-            border-color: var(--text-main);
-            box-shadow: 0 4px 12px rgba(26, 35, 126, 0.2);
+        .metric-label {
+            font-size: 0.65rem;
+            font-weight: 600;
+            color: var(--text-tertiary);
+            letter-spacing: 0.5px;
+            width: 36px;
         }
 
-        /* Style Rack */
+        .metric-value {
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            flex: 1;
+            text-align: right;
+            transition: all 0.15s;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .metric-unit {
+            font-size: 0.55rem;
+            color: var(--text-caption);
+            margin-left: 3px;
+            width: 18px;
+        }
+
+        /* ============ CONFIG ============ */
+        .config-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            padding: 24px;
+            height: 100%;
+            overflow-y: auto;
+            align-content: start;
+        }
+
+        .config-card {
+            background: var(--bg-pure);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 28px;
+        }
+
+        .config-card h3 {
+            color: var(--text-primary);
+            font-size: 1.05rem;
+            font-weight: 700;
+            margin-bottom: 22px;
+            letter-spacing: -0.3px;
+        }
+
+        .config-label {
+            display: block;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 10px;
+            font-size: 0.82rem;
+        }
+
+        .config-label-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .config-label-value {
+            color: var(--accent);
+            font-weight: 700;
+            font-size: 0.82rem;
+            font-variant-numeric: tabular-nums;
+        }
+
         .style-rack {
             display: flex;
-            gap: 12px;
-            margin-bottom: 24px;
+            gap: 8px;
+            margin-bottom: 22px;
         }
 
         .style-btn {
             flex: 1;
-            padding: 12px;
-            border: 2px solid rgba(0, 0, 0, 0.05);
-            background: white;
+            padding: 10px 6px;
+            border: 1px solid var(--border);
+            background: var(--bg);
             border-radius: var(--radius-sm);
-            font-weight: 700;
-            color: var(--text-muted);
+            font-weight: 600;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
             cursor: pointer;
             transition: all 0.2s;
+            font-family: var(--font);
+            text-align: center;
+        }
+
+        .style-btn:hover {
+            background: var(--bg-secondary);
         }
 
         .style-btn.active {
-            border-color: var(--primary);
-            color: var(--primary);
-            background: #F5F9FF;
+            border-color: var(--accent);
+            color: var(--accent);
+            background: var(--accent-light);
         }
 
-        /* Speaking Animation Logic */
-        .speaking .pupil {
-            animation: speak-scan 0.5s infinite alternate ease-in-out;
+        .config-textarea {
+            width: 100%;
+            padding: 14px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            font-family: var(--font);
+            font-size: 0.85rem;
+            color: var(--text-primary);
+            resize: vertical;
+            transition: all 0.2s;
+            line-height: 1.6;
+            margin-bottom: 16px;
         }
 
-        @keyframes speak-scan {
-            0% {
-                transform: translate(-50%, -50%) scale(1);
-            }
+        .config-textarea:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-light);
+            outline: none;
+        }
 
-            100% {
-                transform: translate(-50%, -50%) scale(1.15);
-            }
+        .config-textarea::placeholder {
+            color: var(--text-caption);
+        }
+
+        input[type=range] {
+            width: 100%;
+            accent-color: var(--accent);
+            margin-bottom: 18px;
+            cursor: pointer;
+        }
+
+        .deploy-btn {
+            width: 100%;
+            padding: 13px;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: var(--radius);
+            font-weight: 600;
+            font-size: 0.88rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: var(--font);
+        }
+
+        .deploy-btn:hover {
+            background: var(--accent-hover);
+            transform: scale(1.01);
+        }
+
+        .deploy-btn:active {
+            transform: scale(0.98);
         }
     </style>
 </head>
 
 <body>
-    <div class="app-container">
-        <!-- Sidebar -->
-        <nav class="main-nav">
-            <div class="nav-brand">
-                <div class="brand-icon">📺</div>
-                <div class="brand-text">NewsBot</div>
+    <div class="studio-container">
+
+        <!-- LEFT: SIDEBAR -->
+        <aside class="control-panel">
+            <div class="brand">
+                <div class="brand-logo">N</div>
+                <div class="brand-name">
+                    NewsBot
+                    <span>Studio</span>
+                </div>
             </div>
 
-            <button class="nav-item active" data-tab="dashboard">
-                <span>🔴 Live Studio</span>
+            <button class="nav-item active" data-tab="dashboard" id="tabDashboard">
+                <span class="nav-icon">◉</span> Live Studio
             </button>
-
-            <button class="nav-item" data-tab="config">
-                <span>📰 Editorial Board</span>
+            <button class="nav-item" data-tab="config" id="tabConfig">
+                <span class="nav-icon">⚙</span> Control Room
             </button>
 
             <div class="nav-spacer"></div>
@@ -197,154 +1034,165 @@
                 <span class="status-text">Standby</span>
             </div>
 
-            <button id="startBtn" class="action-btn primary">Go On Air</button>
-            <button id="stopBtn" class="action-btn danger" style="display: none;">Cut Feed</button>
-        </nav>
+            <button id="startBtn" class="go-live-btn">Go Live</button>
+            <button id="stopBtn" class="end-btn" style="display:none;">End Broadcast</button>
+        </aside>
 
-        <!-- Main Content -->
-        <main class="main-content">
+        <!-- CENTER: BROADCAST -->
+        <main class="broadcast-stage">
 
-            <!-- VIEW: LIVE -->
             <div id="view-dashboard" class="view-panel active">
-                <div class="dashboard-grid">
+                <div class="stage-layout">
 
-                    <!-- LEFT COLUMN: Visage & Chat -->
-                    <div class="main-column">
-
-                        <!-- NEWS ANCHOR VISAGE -->
-                        <div class="card panel-visage"
-                            style="background: linear-gradient(135deg, #0D47A1 0%, #1565C0 100%);">
-                            <div class="airowl-eyes-container" id="anchorContainer">
-                                <div class="eye left"
-                                    style="width: 80px; height: 80px; background:white; border-color:white; box-shadow:0 0 30px rgba(0,0,0,0.2);">
-                                    <div class="pupil" style="background: #2962FF; width: 30px; height: 30px;">
-                                        <div class="pupil-highlight" style="background:white; opacity:0.6;"></div>
-                                    </div>
-                                    <div class="eyelid" style="background: #0D47A1;"></div>
-                                </div>
-                                <div class="eye right"
-                                    style="width: 80px; height: 80px; background:white; border-color:white; box-shadow:0 0 30px rgba(0,0,0,0.2);">
-                                    <div class="pupil" style="background: #2962FF; width: 30px; height: 30px;">
-                                        <div class="pupil-highlight" style="background:white; opacity:0.6;"></div>
-                                    </div>
-                                    <div class="eyelid" style="background: #0D47A1;"></div>
-                                </div>
-                            </div>
-                            <div class="visage-status" id="avatarStatus">News Desk Ready</div>
+                    <div class="anchor-stage">
+                        <div class="on-air-badge" id="onAirBadge">
+                            <span class="on-air-dot"></span> ON AIR
                         </div>
 
-                        <!-- Conversation -->
-                        <div class="card panel-comms" style="flex:1; margin-top:20px;">
-                            <div class="card-title">
-                                <span>🗣️ Broadcast Log</span>
-                                <span class="badge"
-                                    style="font-size:0.7rem; background:#E3F2FD; color:#1565C0; padding:4px 8px; border-radius:4px;">LIVE
-                                    TRANSCRIPT</span>
-                            </div>
-                            <div id="chatContainer" class="chat-container">
-                                <div class="bubble assistant">
-                                    <span class="bubble-label">NewsBot</span>
-                                    Welcome to the India AI Summit broadcast. I am ready for your headlines.
-                                </div>
+                        <div class="anchor-orb-container" id="anchorContainer">
+                            <div class="orb-ring ring-3"></div>
+                            <div class="orb-ring ring-2"></div>
+                            <div class="orb-ring ring-1"></div>
+                            <div class="anchor-orb"></div>
+                        </div>
+
+                        <div class="waveform">
+                            <div class="wave-bar" style="--speed:0.45s;--max-h:8px;"></div>
+                            <div class="wave-bar" style="--speed:0.6s;--max-h:18px;"></div>
+                            <div class="wave-bar" style="--speed:0.35s;--max-h:14px;"></div>
+                            <div class="wave-bar" style="--speed:0.55s;--max-h:26px;"></div>
+                            <div class="wave-bar" style="--speed:0.3s;--max-h:32px;"></div>
+                            <div class="wave-bar" style="--speed:0.5s;--max-h:26px;"></div>
+                            <div class="wave-bar" style="--speed:0.4s;--max-h:20px;"></div>
+                            <div class="wave-bar" style="--speed:0.65s;--max-h:14px;"></div>
+                            <div class="wave-bar" style="--speed:0.5s;--max-h:6px;"></div>
+                        </div>
+
+                        <div class="anchor-status" id="avatarStatus">News Desk Ready</div>
+                    </div>
+
+                    <div class="transcript-panel">
+                        <div class="panel-header">
+                            <span>Live Transcript</span>
+                            <span class="live-tag">● REC</span>
+                        </div>
+                        <div id="chatContainer" class="transcript-feed">
+                            <div class="bubble assistant">
+                                <span class="bubble-label">NewsBot</span>
+                                Welcome to the AI News Studio. Ask me about any topic and I'll deliver the latest
+                                updates.
                             </div>
                         </div>
                     </div>
+                </div>
 
-                    <!-- RIGHT COLUMN: News Feed & Controls -->
-                    <section class="panel-intel news-feed-panel">
-
-                        <div class="news-header">
-                            <div class="card-title" style="margin:0;">📰 Wire Service</div>
-                            <button id="refreshNewsBtn" class="category-btn active" style="font-size:0.7rem;">🔄
-                                Sync</button>
+                <div class="ticker-bar">
+                    <div class="ticker-label">LIVE</div>
+                    <div class="ticker-track">
+                        <div class="ticker-content">
+                            AI News Anchor powered by Pipecat AI &bull; India AI Impact Summit 2026 &bull; Real-time
+                            Voice AI
+                            Broadcasting &bull; Powered by Ollama + Kokoro TTS + Whisper STT &bull; Running 100% locally
+                            on AI PC &bull; Ask about Technology, Science, Business, Sports &bull;
                         </div>
-
-                        <div class="category-rack">
-                            <span class="category-btn active" data-category="headlines">Headlines</span>
-                            <span class="category-btn" data-category="technology">Tech</span>
-                            <span class="category-btn" data-category="business">Biz</span>
-                            <span class="category-btn" data-category="sports">Sports</span>
-                        </div>
-
-                        <div id="headlinesPreview">
-                            <!-- JS Injects News Here -->
-                            <div class="headline-item" style="opacity:0.6;">
-                                <span class="headline-text">Waiting for news feed...</span>
-                            </div>
-                        </div>
-
-                        <div class="card metrics-card"
-                            style="margin-top:20px; border:none; padding:0; box-shadow:none;">
-                            <div class="card-title">Performance</div>
-                            <div class="metric-row-compact">
-                                <span class="m-label">HEARING</span>
-                                <span class="m-value" id="sttTime">--</span> ms
-                            </div>
-                            <div class="metric-row-compact">
-                                <span class="m-label">THINKING</span>
-                                <span class="m-value" id="llmTime">--</span> ms
-                            </div>
-                            <div class="metric-row-compact">
-                                <span class="m-label">SPEAKING</span>
-                                <span class="m-value" id="ttsTime">--</span> ms
-                            </div>
-                        </div>
-
-                    </section>
+                    </div>
                 </div>
             </div>
 
-            <!-- VIEW: CONFIG -->
             <div id="view-config" class="view-panel">
-                <div class="config-container">
-
-                    <div class="config-section">
-                        <div class="section-head">📝 Editorial Guidelines</div>
-
-                        <div class="control-group">
-                            <label class="control-label">Anchor Persona</label>
-                            <div class="style-rack" style="display:flex; gap:10px;">
-                                <button class="style-btn active" data-style="professional">👔 Pro</button>
-                                <button class="style-btn" data-style="casual">☕ Casual</button>
-                                <button class="style-btn" data-style="enthusiastic">⚡ Energy</button>
-                            </div>
+                <div class="config-grid">
+                    <div class="config-card">
+                        <h3>📝 Editorial</h3>
+                        <label class="config-label">Anchor Persona</label>
+                        <div class="style-rack">
+                            <button class="style-btn active" data-style="professional">👔 Pro</button>
+                            <button class="style-btn" data-style="casual">☕ Chill</button>
+                            <button class="style-btn" data-style="enthusiastic">⚡ Hype</button>
                         </div>
-
-                        <div class="control-group">
-                            <label class="control-label">Instruction Override</label>
-                            <textarea id="customPrompt" class="modern-input" rows="6"
-                                placeholder="E.g., 'Speak like a 1920s radio announcer' or 'Focus on AI ethics'..."></textarea>
-                        </div>
-
-                        <button id="deployConfigBtn" class="deploy-btn">
-                            ⚡ Update Newscaster
-                        </button>
+                        <label class="config-label">Directive Override</label>
+                        <textarea id="customPrompt" class="config-textarea" rows="5"
+                            placeholder="E.g. 'Speak like a 1920s radio announcer' or 'Focus only on AI news'..."></textarea>
+                        <button id="deployConfigBtn" class="deploy-btn">Deploy Changes</button>
                     </div>
-
-                    <div class="config-section">
-                        <div class="section-head">🎛️ Parameters</div>
-
-                        <div class="control-group">
-                            <label class="control-label" style="display:flex; justify-content:space-between;">
+                    <div class="config-card">
+                        <h3>🎛️ Tuning</h3>
+                        <label class="config-label">
+                            <div class="config-label-row">
                                 <span>Response Length</span>
-                                <span id="tokensDisplay" style="color:var(--primary)">50</span>
-                            </label>
-                            <input type="range" id="llmTokens" min="10" max="250" value="50">
-                        </div>
-
-                        <div class="control-group">
-                            <label class="control-label" style="display:flex; justify-content:space-between;">
-                                <span>Creativity (Temp)</span>
-                                <span id="tempDisplay" style="color:var(--primary)">0.3</span>
-                            </label>
-                            <input type="range" id="llmTemp" min="0" max="1" step="0.1" value="0.3">
-                        </div>
+                                <span class="config-label-value" id="tokensDisplay">50</span>
+                            </div>
+                        </label>
+                        <input type="range" id="llmTokens" min="10" max="250" value="50">
+                        <label class="config-label">
+                            <div class="config-label-row">
+                                <span>Creativity</span>
+                                <span class="config-label-value" id="tempDisplay">0.3</span>
+                            </div>
+                        </label>
+                        <input type="range" id="llmTemp" min="0" max="1" step="0.1" value="0.3">
                     </div>
                 </div>
             </div>
 
         </main>
+
+        <!-- RIGHT: WIRE PANEL -->
+        <aside class="wire-panel">
+            <div class="wire-header">
+                <div class="wire-title">
+                    <span class="wire-icon">📡</span> Wire Service
+                </div>
+                <button id="refreshNewsBtn" class="refresh-btn" title="Refresh">↻</button>
+            </div>
+
+            <div class="category-rack">
+                <span class="category-btn active" data-category="headlines">Top</span>
+                <span class="category-btn" data-category="technology">Tech</span>
+                <span class="category-btn" data-category="business">Biz</span>
+                <span class="category-btn" data-category="sports">Sport</span>
+            </div>
+
+            <div class="wire-timestamp" id="newsTimestamp">Last sync: —</div>
+
+            <div id="headlinesPreview" class="headlines-feed">
+                <div class="headline-item loading">
+                    <span class="headline-text">Syncing wire service...</span>
+                    <span class="headline-source">Waiting</span>
+                </div>
+            </div>
+
+            <div class="metrics-bar">
+                <div class="metric-title">⚡ Latency</div>
+                <div class="metric-item">
+                    <span class="metric-label">STT</span>
+                    <span class="metric-value" id="sttTime">—</span>
+                    <span class="metric-unit">ms</span>
+                </div>
+                <div class="metric-item">
+                    <span class="metric-label">LLM</span>
+                    <span class="metric-value" id="llmTime">—</span>
+                    <span class="metric-unit">ms</span>
+                </div>
+                <div class="metric-item">
+                    <span class="metric-label">TTS</span>
+                    <span class="metric-value" id="ttsTime">—</span>
+                    <span class="metric-unit">ms</span>
+                </div>
+            </div>
+        </aside>
+
     </div>
+
+    <script>
+        // ON AIR badge reacts to connection status
+        const observer = new MutationObserver(() => {
+            const s = document.getElementById('connectionStatus');
+            const b = document.getElementById('onAirBadge');
+            if (s && b) b.classList.toggle('live', s.classList.contains('connected'));
+        });
+        const el = document.getElementById('connectionStatus');
+        if (el) observer.observe(el, { attributes: true, attributeFilter: ['class'] });
+    </script>
 </body>
 
 </html>
