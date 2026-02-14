@@ -14,7 +14,7 @@ echo  =   NEWS ANCHOR VOICE AI - ONE CLICK STARTUP                  =
 echo  =   India AI Impact Summit 2026 - Session 5                          =
 echo  =                                                              =
 echo  =   [1] Ollama LLM    gemma3:4b       Terminal   Port 11434   =
-echo  =   [2] Whisper STT   tiny            Docker     Port 8000    =
+echo  =   [2] Whisper STT   tiny            In-Process (Local)   =
 echo  =   [3] Kokoro TTS    af_heart        In-Process (Local)   =
 echo  =   [4] Pipecat Bot   FastAPI         Terminal   Port 7860    =
 echo  =                                                              =
@@ -76,10 +76,6 @@ echo.
 :: ============================================================
 :: STEP 3: Kokoro TTS (In-Process)
 :: ============================================================
-
-:: ============================================================
-:: STEP 3: Kokoro TTS (In-Process)
-:: ============================================================
 echo [3/4] Kokoro TTS (Preparing)...
 
 :: Stop Piper container if running (cleanup)
@@ -96,7 +92,6 @@ echo.
 echo [4/4] Starting Pipecat News Anchor Bot...
 echo.
 
-set WHISPER_URL=http://localhost:8000/v1
 set OLLAMA_URL=http://localhost:11434/v1
 set LLM_MODEL=gemma3:4b
 set BOT_PORT=7860
@@ -107,7 +102,10 @@ echo    ALL SERVICES READY!
 echo.
 echo    Browser:  http://localhost:7860
 echo.
-echo    Pipeline: Mic - Whisper(8000) - Gemma3(11434) - Kokoro - Speaker
+echo    Pipeline: Mic - Whisper(local) - Gemma3(11434) - Kokoro(local) - Speaker
+echo.
+echo    NOTE: First startup pre-loads all AI models (one-time).
+echo          Subsequent "Go Live" clicks will be instant.
 echo.
 echo  ================================================================
 echo.

@@ -136,6 +136,43 @@ load_dotenv()
 logger.remove()
 logger.add(sys.stderr, level="DEBUG")
 
+# ============================================================
+# PRE-LOAD AI MODELS (one-time cost at server startup)
+# ============================================================
+# Models are loaded ONCE here instead of on every "Go Live" click.
+# This moves the 10-15s model loading cost to server boot time.
+
+logger.info("⏳ Pre-loading AI models (one-time startup cost)...")
+
+_shared_stt = None
+_shared_tts = None
+_shared_vad_analyzer = None
+
+try:
+    _shared_stt = WhisperSTTService(model="tiny", device="auto", no_speech_prob=0.4)
+    logger.info("  ✓ Whisper STT loaded")
+except Exception as e:
+    logger.error(f"  ✗ Whisper STT failed to pre-load: {e}")
+
+try:
+    _shared_tts = KokoroTTSService(voice_id="af_heart")
+    logger.info("  ✓ Kokoro TTS loaded")
+except Exception as e:
+    logger.error(f"  ✗ Kokoro TTS failed to pre-load: {e}")
+
+try:
+    _shared_vad_analyzer = SileroVADAnalyzer(params=VADParams(
+        stop_secs=0.3,
+        start_secs=0.05,
+        confidence=0.4,
+        min_volume=0.2
+    ))
+    logger.info("  ✓ Silero VAD loaded")
+except Exception as e:
+    logger.error(f"  ✗ Silero VAD failed to pre-load: {e}")
+
+logger.info("✅ All AI models pre-loaded! Go Live will be fast.")
+
 app = FastAPI()
 
 app.add_middleware(
@@ -148,6 +185,35 @@ app.add_middleware(
 # Mount UI
 ui_path = Path(__file__).parent / "ui"
 app.mount("/ui", StaticFiles(directory=ui_path), name="ui")
+
+
+@app.on_event("startup")
+async def warmup_ollama():
+    """Pre-warm Ollama so the LLM model is loaded into VRAM before first request.
+    Without this, the first voice interaction waits 10-30s for model loading."""
+    try:
+        import aiohttp
+        # OLLAMA_URL may include /v1 suffix (for OpenAI-compat API used by Pipecat).
+        # The native Ollama API is at the base URL without /v1.
+        ollama_url = os.getenv("OLLAMA_URL", "http://localhost:11434/v1")
+        base_url = ollama_url.replace("/v1", "").rstrip("/")
+        logger.info(f"⏳ Warming up Ollama LLM at {base_url}...")
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                f"{base_url}/api/generate",
+                json={
+                    "model": os.getenv("LLM_MODEL", "gemma3:4b"),
+                    "prompt": "hi",
+                    "stream": False
+                },
+                timeout=aiohttp.ClientTimeout(total=60)
+            ) as resp:
+                if resp.status == 200:
+                    logger.info("  ✓ Ollama LLM warmed up (model loaded in VRAM)")
+                else:
+                    logger.warning(f"  Ollama warmup got status {resp.status}")
+    except Exception as e:
+        logger.warning(f"  Ollama warmup failed (is Ollama running?): {e}")
 
 
 # ============================================================
@@ -303,8 +369,12 @@ def update_prompt_if_needed(context: LLMContext):
 # ============================================================
 
 async def run_bot_impl(connection):
-    """Create and run the Pipecat pipeline for News Anchor."""
-    
+    """Create and run the Pipecat pipeline for News Anchor.
+
+    Uses pre-loaded STT/TTS/VAD models for instant startup.
+    Only transport, context, and LLM are created per-connection.
+    """
+
     transport = SmallWebRTCTransport(
         webrtc_connection=connection,
         params=TransportParams(
@@ -317,16 +387,14 @@ async def run_bot_impl(connection):
         )
     )
 
-    # Speech-to-Text (Local Faster-Whisper)
-    # Using 'tiny' for maximum speed and responsiveness
-    stt = WhisperSTTService(
-        model="tiny",
-        device="auto", 
-        no_speech_prob=0.4
-    )
-    
-    # ... (LLM setup remains same) ...
-    # LLM (Ollama local) — streaming enabled for sentence-by-sentence TTS
+    # STT — use pre-loaded Whisper model (instant) or fallback to fresh load
+    if _shared_stt is not None:
+        stt = _shared_stt
+    else:
+        logger.warning("Pre-loaded STT not available, loading fresh...")
+        stt = WhisperSTTService(model="tiny", device="auto", no_speech_prob=0.4)
+
+    # LLM (Ollama) — lightweight HTTP client, created fresh to pick up config changes
     llm = OLLamaLLMService(
         model=os.getenv("LLM_MODEL", "gemma3:4b"),
         base_url=os.getenv("OLLAMA_URL", "http://localhost:11434/v1"),
@@ -336,24 +404,24 @@ async def run_bot_impl(connection):
         )
     )
 
-    # Text-to-Speech (Kokoro - Local 82M Model)
-    # Using standard service - it handles caching automatically
-    tts = KokoroTTSService(
-        voice_id="af_heart", 
-    )
+    # TTS — use pre-loaded Kokoro model (instant) or fallback to fresh load
+    if _shared_tts is not None:
+        tts = _shared_tts
+    else:
+        logger.warning("Pre-loaded TTS not available, loading fresh...")
+        tts = KokoroTTSService(voice_id="af_heart")
 
-    # VAD Analyzer (Optimized for fast cut-off)
-    # min_volume=0.2 avoids recording background noise as speech
-    # stop_secs=0.3 ensures it stops listening quickly when you finish
-    vad_analyzer = SileroVADAnalyzer(params=VADParams(
-        stop_secs=0.3,
-        start_secs=0.05,
-        confidence=0.4,
-        min_volume=0.2
-    ))
-    vad = VADProcessor(vad_analyzer=vad_analyzer)
+    # VAD — use pre-loaded analyzer or fallback to fresh load
+    if _shared_vad_analyzer is not None:
+        vad = VADProcessor(vad_analyzer=_shared_vad_analyzer)
+    else:
+        logger.warning("Pre-loaded VAD not available, loading fresh...")
+        vad_analyzer = SileroVADAnalyzer(params=VADParams(
+            stop_secs=0.3, start_secs=0.05, confidence=0.4, min_volume=0.2
+        ))
+        vad = VADProcessor(vad_analyzer=vad_analyzer)
 
-    # Context with initial system prompt
+    # Context with initial system prompt (per-connection)
     messages = [{"role": "system", "content": build_system_prompt()}]
     context = LLMContext(messages)
     context_aggregator = LLMContextAggregatorPair(context)
@@ -362,27 +430,20 @@ async def run_bot_impl(connection):
     global_context = context
 
     rtvi = RTVIProcessor(config=RTVIConfig(config=[]))
-    
-    # Sentence aggregator for smooth TTS
-    # Splits on punctuation to stream audio sentence-by-sentence
     sentence_aggregator = SentenceAggregator()
 
     runner = PipelineRunner()
-    
+
     task = PipelineTask(
         pipeline=Pipeline([
             transport.input(),
             vad,
             rtvi,
-            TimingLogger("1. Mic Input"),
             stt,
-            TimingLogger("2. After STT"),
             context_aggregator.user(),
             llm,
-            TimingLogger("3. After LLM"),
             sentence_aggregator,
             tts,
-            TimingLogger("4. After TTS"),
             transport.output(),
             context_aggregator.assistant()
         ]),

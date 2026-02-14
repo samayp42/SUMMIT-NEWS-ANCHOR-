@@ -306,11 +306,19 @@ class NewsAnchorApp {
             const offer = await this.peerConnection.createOffer();
             await this.peerConnection.setLocalDescription(offer);
 
-            // Wait for ICE gathering to complete
+            // Wait for ICE gathering with timeout (2s max)
+            // For local connections, host candidates are gathered instantly.
+            // The STUN server can be slow — don't let it block the connection.
             if (this.peerConnection.iceGatheringState !== 'complete') {
                 await new Promise(resolve => {
+                    const timeout = setTimeout(() => {
+                        console.log('ICE gathering timeout — proceeding with available candidates');
+                        this.peerConnection.removeEventListener('icegatheringstatechange', checkState);
+                        resolve();
+                    }, 2000);
                     const checkState = () => {
                         if (this.peerConnection.iceGatheringState === 'complete') {
+                            clearTimeout(timeout);
                             this.peerConnection.removeEventListener('icegatheringstatechange', checkState);
                             resolve();
                         }
