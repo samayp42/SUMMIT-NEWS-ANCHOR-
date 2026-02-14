@@ -278,7 +278,9 @@ class NewsAnchorApp {
             });
 
             this.peerConnection = new RTCPeerConnection({
-                iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+                // No STUN server needed — this is a fully local app.
+                // Local (host) ICE candidates are gathered instantly without STUN.
+                iceServers: []
             });
 
             this.dataChannel = this.peerConnection.createDataChannel('rtvi', { ordered: true });
