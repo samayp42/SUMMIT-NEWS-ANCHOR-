@@ -20,7 +20,7 @@ class NewsAnchorApp {
             anchorStyle: 'professional'
         };
 
-        this.metrics = { stt: [], llm: [], tts: [] };
+
         this.currentNews = [];
 
         this.init();
@@ -384,26 +384,16 @@ class NewsAnchorApp {
             case 'user-transcription':
                 if (data.final) {
                     this.addMessage('user', data.text);
-                    this.metrics.sttEnd = now;
 
-                    const refInfo = this.metrics.vadEnd || this.metrics.speechStart;
-                    if (refInfo) {
-                        this.recordMetric('stt', now - refInfo);
-                    }
                 }
                 break;
 
             case 'bot-llm-started':
-                this.metrics.llmStart = now;
-                if (this.metrics.sttEnd) {
-                    this.recordMetric('llm', now - this.metrics.sttEnd);
-                }
+
                 break;
 
             case 'bot-tts-started':
-                if (this.metrics.llmStart) {
-                    this.recordMetric('tts', now - this.metrics.llmStart);
-                }
+
                 this.setAnchorSpeaking(true);
                 break;
 
@@ -417,18 +407,7 @@ class NewsAnchorApp {
         }
     }
 
-    recordMetric(type, value) {
-        if (!this.metrics[type]) this.metrics[type] = [];
-        this.metrics[type].push(value);
-        if (this.metrics[type].length > 10) this.metrics[type].shift();
 
-        const el = document.getElementById(type + 'Time');
-        if (el) {
-            el.textContent = value;
-            el.style.fontWeight = '800';
-            setTimeout(() => el.style.fontWeight = '600', 300);
-        }
-    }
 
     disconnect() {
         if (this.peerConnection) this.peerConnection.close();

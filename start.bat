@@ -47,11 +47,13 @@ echo       Starting Ollama (GPU Mode)...
 taskkill /IM ollama.exe /F >nul 2>&1
 timeout /t 1 >nul
 
-REM Force GPU usage
+REM Force GPU usage (Vulkan for Intel Arc / AMD, NUM_GPU for NVIDIA)
+set OLLAMA_VULKAN=1
 set OLLAMA_NUM_GPU=999
 set OLLAMA_KEEP_ALIVE=-1
+set OLLAMA_FLASH_ATTENTION=1
 
-start "Ollama LLM" cmd /k "title Ollama LLM - GPU MODE && color 0A && set OLLAMA_NUM_GPU=999 && set OLLAMA_KEEP_ALIVE=-1 && ollama serve"
+start "Ollama LLM" cmd /k "title Ollama LLM - GPU MODE && color 0A && set OLLAMA_VULKAN=1 && set OLLAMA_NUM_GPU=999 && set OLLAMA_KEEP_ALIVE=-1 && set OLLAMA_FLASH_ATTENTION=1 && ollama serve"
 timeout /t 5 >nul
 
 :: Check model

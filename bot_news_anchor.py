@@ -5,9 +5,9 @@ India AI Impact Summit 2026 - Session 5: Pipecat Voice AI
 
 A real-time voice AI news reporter that:
 - Listens to your spoken questions (Whisper STT)
-- Understands your intent (Ollama LLM)
+- Understands your intent (Ollama LLM via native /api/chat)
 - Fetches real-time news from APIs
-- Responds with natural speech (Piper TTS)
+- Responds with natural speech (Kokoro TTS)
 
 Run with: python bot_news_anchor.py
 Open: http://localhost:7860/
@@ -17,6 +17,8 @@ import asyncio
 import os
 import sys
 import json
+import time
+import aiohttp
 from pathlib import Path
 from datetime import datetime
 
@@ -25,15 +27,15 @@ from fastapi.responses import JSONResponse, HTMLResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from pipecat.processors.frame_processor import FrameProcessor
+from pipecat.processors.frame_processor import FrameProcessor, FrameDirection
 from pipecat.frames.frames import (
-    TextFrame, 
-    TranscriptionFrame, 
+    Frame,
     LLMMessagesFrame,
-    TTSStartedFrame,
-    TTSStoppedFrame,
-    StartFrame,
-    EndFrame
+    LLMContextFrame,
+    LLMFullResponseStartFrame,
+    LLMFullResponseEndFrame,
+    LLMTextFrame,
+    LLMUpdateSettingsFrame,
 )
 
 from loguru import logger
@@ -44,91 +46,164 @@ from dotenv import load_dotenv
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineTask, PipelineParams
-from pipecat.frames.frames import LLMMessagesFrame, EndFrame, StartFrame
 from pipecat.processors.aggregators.llm_context import LLMContext
-from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
-from pipecat.processors.aggregators.sentence import SentenceAggregator
-
-import time
-
-class TimingLogger(FrameProcessor):
-    """Log frames to debug latency."""
-    def __init__(self, prefix=""):
-        super().__init__()
-        self.prefix = prefix
-        self.last_time = time.time()
-
-    async def process_frame(self, frame, direction):
-        await super().process_frame(frame, direction)
-        
-        # Log INTERESTING events (ignore raw audio flood)
-        if isinstance(frame, (TranscriptionFrame, TextFrame, LLMMessagesFrame)):
-            content = str(frame)
-            if hasattr(frame, "text"): content = frame.text
-            logger.debug(f"⏱️ [{self.prefix}] {type(frame).__name__}: {content[:100]}...")
-            
-        elif isinstance(frame, (TTSStartedFrame, TTSStoppedFrame, StartFrame, EndFrame)):
-             logger.debug(f"⏱️ [{self.prefix}] ⚡ EVENT: {type(frame).__name__}")
-            
-        await self.push_frame(frame, direction)
-
-
+from pipecat.processors.aggregators.llm_response_universal import (
+    LLMContextAggregatorPair,
+    LLMUserAggregatorParams,
+)
 
 # Services
-from pipecat.services.ollama.llm import OLLamaLLMService
 from pipecat.services.kokoro.tts import KokoroTTSService
 from pipecat.services.whisper.stt import WhisperSTTService
 
 # Audio / VAD
 from pipecat.audio.vad.silero import SileroVADAnalyzer, VADParams
-from pipecat.audio.vad.vad_analyzer import VADAnalyzer
-from pipecat.processors.audio.vad_processor import VADProcessor
 
 # Transport
 from pipecat.transports.base_transport import TransportParams
 from pipecat.transports.smallwebrtc.transport import SmallWebRTCTransport
 from pipecat.transports.smallwebrtc.connection import SmallWebRTCConnection
 
-# Frameworks
-from pipecat.processors.frameworks.rtvi import RTVIProcessor, RTVIConfig
-
 # Local imports
 from news_service import (
-    get_current_news_sync, 
-    create_news_context_prompt, 
+    get_current_news_sync,
+    create_news_context_prompt,
     fetch_live_news,
     update_news_cache,
     NEWS_CATEGORIES
 )
 
-# Custom Turn Analyzer (fallback if not available)
-sys.path.append(os.path.join(os.path.dirname(__file__), '../local-bot'))
-try:
-    from bot_local import LocalSmartTurnAnalyzerV3
-except ImportError:
-    from pipecat.processors.aggregators.llm_response import LLMUserResponseAggregator
-    class LocalSmartTurnAnalyzerV3(LLMUserResponseAggregator):
-        pass
 
+# ============================================================
+# CUSTOM OLLAMA LLM SERVICE — Native /api/chat (fast, no OpenAI overhead)
+# ============================================================
 
-# Check for GPU/ONNX support
-try:
-    import onnxruntime as ort
-    logger.debug(f"🚀 ONNX Runtime Providers: {ort.get_available_providers()}")
-except ImportError:
-    logger.warning("ONNX Runtime not found")
+class OllamaDirectLLMService(FrameProcessor):
+    """Direct Ollama LLM using native /api/chat endpoint for maximum speed.
 
-class FlexibleKokoroTTSService(KokoroTTSService):
-    """Kokoro TTS with device selection and local model support."""
-    def __init__(self, device: str = None, repo_id: str = "hexgrad/Kokoro-82M", **kwargs):
-        super().__init__(**kwargs)
-        if device or repo_id:
-             logger.info(f"🔄 Re-initializing Kokoro pipeline on device: {device} | Repo: {repo_id}")
-             try:
-                 from kokoro import KPipeline
-                 self._pipeline = KPipeline(lang_code=self._lang_code, repo_id=repo_id, device=device)
-             except Exception as e:
-                 logger.error(f"Failed to init Kokoro pipeline: {e}")
+    Bypasses the OpenAI-compatible /v1/chat/completions endpoint entirely.
+    Uses aiohttp for streaming NDJSON responses with minimal overhead.
+    """
+
+    def __init__(
+        self,
+        *,
+        model: str = "gemma3:4b",
+        base_url: str = "http://localhost:11434",
+        temperature: float = 0.3,
+        num_predict: int = 80,
+        num_ctx: int = 2048,
+    ):
+        super().__init__()
+        self._model = model
+        # Strip /v1 suffix if present — we use the native API
+        self._base_url = base_url.rstrip("/").replace("/v1", "")
+        self._temperature = temperature
+        self._num_predict = num_predict
+        self._num_ctx = num_ctx
+        self._session: aiohttp.ClientSession | None = None
+
+    async def _ensure_session(self):
+        if self._session is None or self._session.closed:
+            timeout = aiohttp.ClientTimeout(total=30, sock_connect=5)
+            self._session = aiohttp.ClientSession(timeout=timeout)
+
+    async def cleanup(self):
+        if self._session and not self._session.closed:
+            await self._session.close()
+        await super().cleanup()
+
+    async def process_frame(self, frame: Frame, direction: FrameDirection):
+        await super().process_frame(frame, direction)
+
+        context = None
+        if isinstance(frame, LLMContextFrame):
+            context = frame.context
+        elif isinstance(frame, LLMMessagesFrame):
+            context = frame
+        elif isinstance(frame, LLMUpdateSettingsFrame):
+            settings = frame.settings
+            if "temperature" in settings:
+                self._temperature = settings["temperature"]
+            if "num_predict" in settings:
+                self._num_predict = settings["num_predict"]
+            return
+        else:
+            await self.push_frame(frame, direction)
+            return
+
+        if context:
+            await self.push_frame(LLMFullResponseStartFrame())
+            try:
+                await self._stream_ollama_chat(context)
+            except Exception as e:
+                logger.error(f"Ollama LLM error: {e}")
+            finally:
+                await self.push_frame(LLMFullResponseEndFrame())
+
+    async def _stream_ollama_chat(self, context):
+        """Stream tokens from Ollama native /api/chat endpoint."""
+        await self._ensure_session()
+
+        # Extract messages from context
+        if isinstance(context, LLMContext):
+            messages = context.get_messages()
+        elif hasattr(context, "messages"):
+            messages = context.messages
+        else:
+            messages = [{"role": "user", "content": str(context)}]
+
+        # Clean messages for Ollama native API (only role + content)
+        clean_messages = []
+        for msg in messages:
+            if isinstance(msg, dict) and "role" in msg and "content" in msg:
+                clean_messages.append({
+                    "role": msg["role"],
+                    "content": msg["content"]
+                })
+
+        payload = {
+            "model": self._model,
+            "messages": clean_messages,
+            "stream": True,
+            "options": {
+                "temperature": self._temperature,
+                "num_predict": self._num_predict,
+                "num_ctx": self._num_ctx,
+            }
+        }
+
+        url = f"{self._base_url}/api/chat"
+        t0 = time.monotonic()
+        first_token = True
+
+        async with self._session.post(url, json=payload) as resp:
+            if resp.status != 200:
+                error_text = await resp.text()
+                logger.error(f"Ollama /api/chat returned {resp.status}: {error_text}")
+                return
+
+            async for line in resp.content:
+                if not line:
+                    continue
+                try:
+                    data = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+
+                if data.get("done", False):
+                    elapsed = time.monotonic() - t0
+                    logger.debug(f"Ollama complete in {elapsed:.2f}s")
+                    break
+
+                token = data.get("message", {}).get("content", "")
+                if token:
+                    if first_token:
+                        ttfb = time.monotonic() - t0
+                        logger.info(f"LLM TTFB: {ttfb:.3f}s")
+                        first_token = False
+                    await self.push_frame(LLMTextFrame(token))
+
 
 # Load environment variables
 load_dotenv()
@@ -193,8 +268,7 @@ async def warmup_ollama():
     Without this, the first voice interaction waits 10-30s for model loading."""
     try:
         import aiohttp
-        # OLLAMA_URL may include /v1 suffix (for OpenAI-compat API used by Pipecat).
-        # The native Ollama API is at the base URL without /v1.
+        # Use native Ollama API for warmup
         ollama_url = os.getenv("OLLAMA_URL", "http://localhost:11434/v1")
         base_url = ollama_url.replace("/v1", "").rstrip("/")
         logger.info(f"⏳ Warming up Ollama LLM at {base_url}...")
@@ -222,39 +296,39 @@ async def warmup_ollama():
 
 class Config:
     """Configuration state for the News Anchor bot."""
-    
+
     # Current news category
     news_category = "headlines"
-    
+
     # News cache (refreshed periodically)
     cached_news = {}
     last_news_update = None
-    
+
     # Features
     features = {
         "live_news": True,      # Fetch real news from API
         "mock_fallback": True,  # Use mock data if API fails
         "detailed_mode": False  # Provide longer explanations
     }
-    
+
     # Custom instruction overlay
     custom_prompt = ""
-    
+
     # LLM parameters
     llm_params = {
         "temperature": 0.3,  # Slightly creative for natural speech
         "max_tokens": 100    # Longer for news summaries
     }
-    
+
     # Anchor personality (can be customized)
     anchor_style = "professional"  # professional, casual, enthusiastic
-    
+
     @classmethod
     def get_news(cls, category: str = None):
         """Get current news for specified category."""
         cat = category or cls.news_category
         return get_current_news_sync(cat)
-    
+
     @classmethod
     async def refresh_news(cls, category: str = None):
         """Refresh news from API."""
@@ -331,28 +405,28 @@ def get_time_greeting() -> str:
 
 def build_system_prompt() -> str:
     """Build the complete system prompt for the News Anchor."""
-    
+
     # 1. Core identity
     prompt = CORE_ANCHOR_PROMPT
-    
+
     # 2. Personality style
     style = ANCHOR_PERSONALITIES.get(Config.anchor_style, ANCHOR_PERSONALITIES["professional"])
     prompt += f"\n{style}\n"
-    
+
     # 3. Custom instructions (if any)
     if Config.custom_prompt and len(Config.custom_prompt.strip()) > 0:
         prompt += f"\nCUSTOM DIRECTIVE:\n{Config.custom_prompt}\n"
-    
+
     # 4. Live news context
     if Config.features.get("live_news", True):
         news_context = create_news_context_prompt(Config.news_category)
         prompt += f"\n{news_context}\n"
-    
+
     # 5. Time context
     now = datetime.now()
     prompt += f"\nCURRENT TIME: {now.strftime('%B %d, %Y at %I:%M %p')}\n"
     prompt += f"Use this for time-appropriate greetings (Good {get_time_greeting()}!)\n"
-    
+
     return prompt
 
 
@@ -394,14 +468,13 @@ async def run_bot_impl(connection):
         logger.warning("Pre-loaded STT not available, loading fresh...")
         stt = WhisperSTTService(model="tiny", device="auto", no_speech_prob=0.4)
 
-    # LLM (Ollama) — lightweight HTTP client, created fresh to pick up config changes
-    llm = OLLamaLLMService(
+    # LLM (Ollama) — Direct native /api/chat, no OpenAI overhead
+    llm = OllamaDirectLLMService(
         model=os.getenv("LLM_MODEL", "gemma3:4b"),
-        base_url=os.getenv("OLLAMA_URL", "http://localhost:11434/v1"),
-        params=OLLamaLLMService.InputParams(
-            temperature=Config.llm_params.get("temperature", 0.3),
-            max_tokens=Config.llm_params.get("max_tokens", 100),
-        )
+        base_url=os.getenv("OLLAMA_URL", "http://localhost:11434"),
+        temperature=Config.llm_params.get("temperature", 0.3),
+        num_predict=Config.llm_params.get("max_tokens", 80),
+        num_ctx=2048,
     )
 
     # TTS — use pre-loaded Kokoro model (instant) or fallback to fresh load
@@ -411,44 +484,49 @@ async def run_bot_impl(connection):
         logger.warning("Pre-loaded TTS not available, loading fresh...")
         tts = KokoroTTSService(voice_id="af_heart")
 
-    # VAD — use pre-loaded analyzer or fallback to fresh load
+    # VAD — use pre-loaded analyzer or create fresh
     if _shared_vad_analyzer is not None:
-        vad = VADProcessor(vad_analyzer=_shared_vad_analyzer)
+        vad_analyzer = _shared_vad_analyzer
     else:
         logger.warning("Pre-loaded VAD not available, loading fresh...")
         vad_analyzer = SileroVADAnalyzer(params=VADParams(
             stop_secs=0.3, start_secs=0.05, confidence=0.4, min_volume=0.2
         ))
-        vad = VADProcessor(vad_analyzer=vad_analyzer)
 
     # Context with initial system prompt (per-connection)
     messages = [{"role": "system", "content": build_system_prompt()}]
     context = LLMContext(messages)
-    context_aggregator = LLMContextAggregatorPair(context)
+
+    # VAD integrated into user aggregator — this is critical for turn detection.
+    # Without vad_analyzer here, the aggregator never knows when you stop speaking
+    # and never triggers the LLM.
+    user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
+        context,
+        user_params=LLMUserAggregatorParams(vad_analyzer=vad_analyzer),
+    )
 
     global global_context
     global_context = context
 
-    rtvi = RTVIProcessor(config=RTVIConfig(config=[]))
-    sentence_aggregator = SentenceAggregator()
-
-    runner = PipelineRunner()
+    runner = PipelineRunner(handle_sigint=False)
 
     task = PipelineTask(
         pipeline=Pipeline([
-            transport.input(),
-            vad,
-            rtvi,
-            stt,
-            context_aggregator.user(),
-            llm,
-            sentence_aggregator,
-            tts,
-            transport.output(),
-            context_aggregator.assistant()
+            transport.input(),       # WebRTC audio in
+            stt,                     # Whisper STT
+            user_aggregator,         # Accumulates user speech, triggers LLM on turn end
+            llm,                     # Ollama native /api/chat
+            tts,                     # Kokoro TTS (handles sentence aggregation internally)
+            transport.output(),      # WebRTC audio out
+            assistant_aggregator,    # Tracks assistant responses for context
         ]),
         params=PipelineParams(allow_interruptions=True)
     )
+
+    @transport.event_handler("on_client_disconnected")
+    async def on_client_disconnected(transport, client):
+        logger.info("Client disconnected")
+        await task.cancel()
 
     await runner.run(task)
 
@@ -481,25 +559,25 @@ async def get_config():
 async def update_config(request: Request):
     """Update configuration."""
     data = await request.json()
-    
+
     if "newsCategory" in data:
         Config.news_category = data["newsCategory"]
         # Refresh news for this category
         await Config.refresh_news(data["newsCategory"])
-        
+
     if "customPrompt" in data:
         Config.custom_prompt = data["customPrompt"]
-        
+
     if "features" in data:
         Config.features.update(data["features"])
-        
+
     if "llmParams" in data:
         Config.llm_params.update(data["llmParams"])
-        
+
     if "anchorStyle" in data:
         if data["anchorStyle"] in ANCHOR_PERSONALITIES:
             Config.anchor_style = data["anchorStyle"]
-    
+
     # Real-time prompt update
     if global_context:
         try:
@@ -507,7 +585,7 @@ async def update_config(request: Request):
             logger.info("⚡ Real-time prompt update triggered!")
         except Exception as e:
             logger.error(f"Failed to update context: {e}")
-            
+
     return {
         "status": "ok",
         "config": {
@@ -523,7 +601,7 @@ async def get_news(category: str = "headlines"):
     """Get news for a category — always tries fresh fetch first."""
     articles = []
     source = "mock"
-    
+
     if Config.features.get("live_news"):
         try:
             articles = await fetch_live_news(category)
@@ -534,13 +612,13 @@ async def get_news(category: str = "headlines"):
                 Config.last_news_update = datetime.now()
         except Exception as e:
             logger.warning(f"Live news fetch failed: {e}")
-    
+
     if not articles:
         articles = get_current_news_sync(category)
         source = "cache/mock"
-    
+
     logger.info(f"📰 Serving {len(articles)} articles [{source}] for '{category}'")
-    
+
     return {
         "category": category,
         "articles": articles,
@@ -554,9 +632,9 @@ async def refresh_news(request: Request):
     """Manually refresh news cache."""
     data = await request.json()
     category = data.get("category", Config.news_category)
-    
+
     await Config.refresh_news(category)
-    
+
     return {
         "status": "ok",
         "category": category,
@@ -570,19 +648,19 @@ async def sdp_offer(request: Request):
     data = await request.json()
     sdp = data['sdp']
     type = data['type']
-    
+
     # Create new WebRTC connection
     conn = SmallWebRTCConnection()
-    
+
     # Initialize with the incoming offer
     await conn.initialize(sdp, type)
-    
+
     # Get the answer
     answer = conn.get_answer()
-    
+
     # Start the bot pipeline in the background
     asyncio.create_task(run_bot_impl(conn))
-    
+
     return answer
 
 
@@ -592,9 +670,9 @@ async def sdp_offer(request: Request):
 
 if __name__ == "__main__":
     import uvicorn
-    
+
     port = int(os.getenv("BOT_PORT", 7860))
-    
+
     logger.info(f"""
     ╔═══════════════════════════════════════════════════════════╗
     ║                                                           ║
@@ -608,5 +686,5 @@ if __name__ == "__main__":
     ║                                                           ║
     ╚═══════════════════════════════════════════════════════════╝
     """)
-    
+
     uvicorn.run(app, host="0.0.0.0", port=port)

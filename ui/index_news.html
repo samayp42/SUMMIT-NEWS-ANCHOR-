@@ -825,52 +825,7 @@
             flex-shrink: 0;
         }
 
-        /* Metrics */
-        .metrics-bar {
-            border-top: 1px solid var(--border);
-            padding: 16px 20px;
-            flex-shrink: 0;
-        }
 
-        .metric-title {
-            font-size: 0.6rem;
-            font-weight: 700;
-            color: var(--text-caption);
-            letter-spacing: 1.5px;
-            text-transform: uppercase;
-            margin-bottom: 10px;
-        }
-
-        .metric-item {
-            display: flex;
-            align-items: center;
-            padding: 5px 0;
-        }
-
-        .metric-label {
-            font-size: 0.65rem;
-            font-weight: 600;
-            color: var(--text-tertiary);
-            letter-spacing: 0.5px;
-            width: 36px;
-        }
-
-        .metric-value {
-            font-size: 0.85rem;
-            font-weight: 700;
-            color: var(--text-primary);
-            flex: 1;
-            text-align: right;
-            transition: all 0.15s;
-            font-variant-numeric: tabular-nums;
-        }
-
-        .metric-unit {
-            font-size: 0.55rem;
-            color: var(--text-caption);
-            margin-left: 3px;
-            width: 18px;
-        }
 
         /* ============ CONFIG ============ */
         .config-grid {
@@ -1161,24 +1116,7 @@
                 </div>
             </div>
 
-            <div class="metrics-bar">
-                <div class="metric-title">⚡ Latency</div>
-                <div class="metric-item">
-                    <span class="metric-label">STT</span>
-                    <span class="metric-value" id="sttTime">—</span>
-                    <span class="metric-unit">ms</span>
-                </div>
-                <div class="metric-item">
-                    <span class="metric-label">LLM</span>
-                    <span class="metric-value" id="llmTime">—</span>
-                    <span class="metric-unit">ms</span>
-                </div>
-                <div class="metric-item">
-                    <span class="metric-label">TTS</span>
-                    <span class="metric-value" id="ttsTime">—</span>
-                    <span class="metric-unit">ms</span>
-                </div>
-            </div>
+
         </aside>
 
     </div>
