@@ -19,78 +19,45 @@ import sys
 import json
 from pathlib import Path
 from datetime import datetime
+from contextlib import asynccontextmanager
+from typing import Dict
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, BackgroundTasks
 from fastapi.responses import JSONResponse, HTMLResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from pipecat.processors.frame_processor import FrameProcessor
-from pipecat.frames.frames import (
-    TextFrame, 
-    TranscriptionFrame, 
-    LLMMessagesFrame,
-    TTSStartedFrame,
-    TTSStoppedFrame,
-    StartFrame,
-    EndFrame
-)
-
 from loguru import logger
 from dotenv import load_dotenv
-
 
 # Pipecat Imports
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineTask, PipelineParams
-from pipecat.frames.frames import LLMMessagesFrame, EndFrame, StartFrame
-from pipecat.processors.aggregators.llm_context import LLMContext
-from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
-from pipecat.processors.aggregators.sentence import SentenceAggregator
-
-import time
-
-class TimingLogger(FrameProcessor):
-    """Log frames to debug latency."""
-    def __init__(self, prefix=""):
-        super().__init__()
-        self.prefix = prefix
-        self.last_time = time.time()
-
-    async def process_frame(self, frame, direction):
-        await super().process_frame(frame, direction)
-        
-        # Log INTERESTING events (ignore raw audio flood)
-        if isinstance(frame, (TranscriptionFrame, TextFrame, LLMMessagesFrame)):
-            content = str(frame)
-            if hasattr(frame, "text"): content = frame.text
-            logger.debug(f"⏱️ [{self.prefix}] {type(frame).__name__}: {content[:100]}...")
-            
-        elif isinstance(frame, (TTSStartedFrame, TTSStoppedFrame, StartFrame, EndFrame)):
-             logger.debug(f"⏱️ [{self.prefix}] ⚡ EVENT: {type(frame).__name__}")
-            
-        await self.push_frame(frame, direction)
-
-
 
 # Services
 from pipecat.services.ollama.llm import OLLamaLLMService
 from pipecat.services.kokoro.tts import KokoroTTSService
 from pipecat.services.whisper.stt import WhisperSTTService
 
+# Context aggregation (universal, non-deprecated API for pipecat >=0.0.102)
+from pipecat.processors.aggregators.llm_context import LLMContext
+from pipecat.processors.aggregators.llm_response_universal import (
+    LLMContextAggregatorPair,
+    LLMUserAggregatorParams,
+)
+from pipecat.frames.frames import LLMRunFrame, TTSSpeakFrame
+
 # Audio / VAD
 from pipecat.audio.vad.silero import SileroVADAnalyzer, VADParams
-from pipecat.audio.vad.vad_analyzer import VADAnalyzer
-from pipecat.processors.audio.vad_processor import VADProcessor
 
 # Transport
 from pipecat.transports.base_transport import TransportParams
 from pipecat.transports.smallwebrtc.transport import SmallWebRTCTransport
 from pipecat.transports.smallwebrtc.connection import SmallWebRTCConnection
 
-# Frameworks
-from pipecat.processors.frameworks.rtvi import RTVIProcessor, RTVIConfig
+# NOTE: RTVIProcessor + RTVIObserver are auto-added by PipelineTask in pipecat 0.0.102.
+# Do NOT import or add them manually — it causes duplicate event firing.
 
 # Local imports
 from news_service import (
@@ -101,40 +68,17 @@ from news_service import (
     NEWS_CATEGORIES
 )
 
-# Custom Turn Analyzer (fallback if not available)
-sys.path.append(os.path.join(os.path.dirname(__file__), '../local-bot'))
-try:
-    from bot_local import LocalSmartTurnAnalyzerV3
-except ImportError:
-    from pipecat.processors.aggregators.llm_response import LLMUserResponseAggregator
-    class LocalSmartTurnAnalyzerV3(LLMUserResponseAggregator):
-        pass
-
-
-# Check for GPU/ONNX support
-try:
-    import onnxruntime as ort
-    logger.debug(f"🚀 ONNX Runtime Providers: {ort.get_available_providers()}")
-except ImportError:
-    logger.warning("ONNX Runtime not found")
-
-class FlexibleKokoroTTSService(KokoroTTSService):
-    """Kokoro TTS with device selection and local model support."""
-    def __init__(self, device: str = None, repo_id: str = "hexgrad/Kokoro-82M", **kwargs):
-        super().__init__(**kwargs)
-        if device or repo_id:
-             logger.info(f"🔄 Re-initializing Kokoro pipeline on device: {device} | Repo: {repo_id}")
-             try:
-                 from kokoro import KPipeline
-                 self._pipeline = KPipeline(lang_code=self._lang_code, repo_id=repo_id, device=device)
-             except Exception as e:
-                 logger.error(f"Failed to init Kokoro pipeline: {e}")
-
 # Load environment variables
 load_dotenv()
 
 logger.remove()
-logger.add(sys.stderr, level="DEBUG")
+
+def _vad_spam_filter(record):
+    """Filter out the extremely noisy VAD set_params log lines."""
+    return "pipecat.audio.vad" not in record["name"]
+
+logger.add(sys.stderr, level="INFO", filter=_vad_spam_filter)
+logger.add("log.txt", level="DEBUG", rotation="5 MB", retention="3 days", filter=_vad_spam_filter)
 
 # ============================================================
 # PRE-LOAD AI MODELS (one-time cost at server startup)
@@ -146,10 +90,9 @@ logger.info("⏳ Pre-loading AI models (one-time startup cost)...")
 
 _shared_stt = None
 _shared_tts = None
-_shared_vad_analyzer = None
 
 try:
-    _shared_stt = WhisperSTTService(model="tiny", device="auto", no_speech_prob=0.4)
+    _shared_stt = WhisperSTTService(model="tiny", device="cpu", compute_type="int8", no_speech_prob=0.4)
     logger.info("  ✓ Whisper STT loaded")
 except Exception as e:
     logger.error(f"  ✗ Whisper STT failed to pre-load: {e}")
@@ -160,41 +103,16 @@ try:
 except Exception as e:
     logger.error(f"  ✗ Kokoro TTS failed to pre-load: {e}")
 
-try:
-    _shared_vad_analyzer = SileroVADAnalyzer(params=VADParams(
-        stop_secs=0.3,
-        start_secs=0.05,
-        confidence=0.4,
-        min_volume=0.2
-    ))
-    logger.info("  ✓ Silero VAD loaded")
-except Exception as e:
-    logger.error(f"  ✗ Silero VAD failed to pre-load: {e}")
+logger.info("✅ AI models pre-loaded! Go Live will be fast.")
 
-logger.info("✅ All AI models pre-loaded! Go Live will be fast.")
-
-app = FastAPI()
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# Mount UI
-ui_path = Path(__file__).parent / "ui"
-app.mount("/ui", StaticFiles(directory=ui_path), name="ui")
+# Peer connection tracking for WebRTC lifecycle management
+pcs_map: Dict[str, SmallWebRTCConnection] = {}
 
 
-@app.on_event("startup")
-async def warmup_ollama():
-    """Pre-warm Ollama so the LLM model is loaded into VRAM before first request.
-    Without this, the first voice interaction waits 10-30s for model loading."""
+async def _warmup_ollama():
+    """Pre-warm Ollama so the LLM model is loaded into VRAM before first request."""
     try:
         import aiohttp
-        # OLLAMA_URL may include /v1 suffix (for OpenAI-compat API used by Pipecat).
-        # The native Ollama API is at the base URL without /v1.
         ollama_url = os.getenv("OLLAMA_URL", "http://localhost:11434/v1")
         base_url = ollama_url.replace("/v1", "").rstrip("/")
         logger.info(f"⏳ Warming up Ollama LLM at {base_url}...")
@@ -214,6 +132,30 @@ async def warmup_ollama():
                     logger.warning(f"  Ollama warmup got status {resp.status}")
     except Exception as e:
         logger.warning(f"  Ollama warmup failed (is Ollama running?): {e}")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Startup: warm up Ollama. Shutdown: clean up peer connections."""
+    await _warmup_ollama()
+    yield
+    coros = [pc.disconnect() for pc in pcs_map.values()]
+    await asyncio.gather(*coros)
+    pcs_map.clear()
+
+
+app = FastAPI(lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Mount UI
+ui_path = Path(__file__).parent / "ui"
+app.mount("/ui", StaticFiles(directory=ui_path), name="ui")
 
 
 # ============================================================
@@ -309,6 +251,12 @@ MISSION:
 - Summarize the story, don't read the headline verbatim.
 - "According to [Source]..." is good.
 
+INTERACTION RULES:
+- ALWAYS end every response with a short engaging question to keep the conversation going.
+- Examples: "Want to hear more?", "Shall I dive deeper into this?", "What topic interests you next?"
+- This is a live real-time conversation. Keep it flowing naturally.
+- When the user responds, acknowledge briefly then deliver the next update.
+
 STYLE:
 - Crisp.
 - Deliver news with speed and accuracy.
@@ -316,6 +264,7 @@ STYLE:
 - Pause frequently (use periods).
 - Like a breaking news ticker tape spoken aloud.
 - If user asks a question, answer immediately with facts.
+- Always end with a question to invite the user to respond.
 """
 
 def get_time_greeting() -> str:
@@ -356,12 +305,20 @@ def build_system_prompt() -> str:
     return prompt
 
 
-def update_prompt_if_needed(context: LLMContext):
-    """Update context's system prompt if config changed."""
+def update_prompt_if_needed(context_aggregator):
+    """Update context's system prompt if config changed.
+    
+    Works with LLMContextAggregatorPair from pipecat's universal API.
+    The user aggregator holds the LLM context with messages.
+    """
     new_prompt = build_system_prompt()
-    if context.messages and context.messages[0]["role"] == "system":
-        context.messages[0]["content"] = new_prompt
-        logger.info("📝 News Anchor prompt updated!")
+    try:
+        context = context_aggregator.user()._context
+        if context.messages and context.messages[0]["role"] == "system":
+            context.messages[0]["content"] = new_prompt
+            logger.info("📝 News Anchor prompt updated!")
+    except Exception as e:
+        logger.warning(f"Could not update prompt via context_aggregator: {e}")
 
 
 # ============================================================
@@ -371,20 +328,22 @@ def update_prompt_if_needed(context: LLMContext):
 async def run_bot_impl(connection):
     """Create and run the Pipecat pipeline for News Anchor.
 
-    Uses pre-loaded STT/TTS/VAD models for instant startup.
-    Only transport, context, and LLM are created per-connection.
+    Pipecat 0.0.102 architecture:
+    - VAD inside LLMUserAggregatorParams (TransportParams.vad_analyzer is deprecated)
+    - PipelineTask auto-adds RTVIProcessor + RTVIObserver (do NOT add manually)
+    - SmallWebRTCTransport events: on_client_connected, on_client_disconnected
+    - Greeting triggered via LLMRunFrame() through the user aggregator
     """
 
+    # Transport — no VAD here (deprecated in 0.0.102, moved to LLMUserAggregatorParams)
     transport = SmallWebRTCTransport(
         webrtc_connection=connection,
         params=TransportParams(
             audio_out_enabled=True,
             audio_in_enabled=True,
-            video_out_enabled=False,
-            video_in_enabled=False,
             audio_out_sample_rate=24000,
             audio_in_sample_rate=16000,
-        )
+        ),
     )
 
     # STT — use pre-loaded Whisper model (instant) or fallback to fresh load
@@ -392,7 +351,7 @@ async def run_bot_impl(connection):
         stt = _shared_stt
     else:
         logger.warning("Pre-loaded STT not available, loading fresh...")
-        stt = WhisperSTTService(model="tiny", device="auto", no_speech_prob=0.4)
+        stt = WhisperSTTService(model="tiny", device="cpu", compute_type="int8", no_speech_prob=0.4)
 
     # LLM (Ollama) — lightweight HTTP client, created fresh to pick up config changes
     llm = OLLamaLLMService(
@@ -411,45 +370,71 @@ async def run_bot_impl(connection):
         logger.warning("Pre-loaded TTS not available, loading fresh...")
         tts = KokoroTTSService(voice_id="af_heart")
 
-    # VAD — use pre-loaded analyzer or fallback to fresh load
-    if _shared_vad_analyzer is not None:
-        vad = VADProcessor(vad_analyzer=_shared_vad_analyzer)
-    else:
-        logger.warning("Pre-loaded VAD not available, loading fresh...")
-        vad_analyzer = SileroVADAnalyzer(params=VADParams(
-            stop_secs=0.3, start_secs=0.05, confidence=0.4, min_volume=0.2
-        ))
-        vad = VADProcessor(vad_analyzer=vad_analyzer)
+    # VAD — placed in LLMUserAggregatorParams (the non-deprecated location in 0.0.102)
+    vad = SileroVADAnalyzer(params=VADParams(
+        stop_secs=0.3,
+        start_secs=0.05,
+        confidence=0.5,
+        min_volume=0.3,
+    ))
 
     # Context with initial system prompt (per-connection)
     messages = [{"role": "system", "content": build_system_prompt()}]
     context = LLMContext(messages)
-    context_aggregator = LLMContextAggregatorPair(context)
-
-    global global_context
-    global_context = context
-
-    rtvi = RTVIProcessor(config=RTVIConfig(config=[]))
-    sentence_aggregator = SentenceAggregator()
-
-    runner = PipelineRunner()
-
-    task = PipelineTask(
-        pipeline=Pipeline([
-            transport.input(),
-            vad,
-            rtvi,
-            stt,
-            context_aggregator.user(),
-            llm,
-            sentence_aggregator,
-            tts,
-            transport.output(),
-            context_aggregator.assistant()
-        ]),
-        params=PipelineParams(allow_interruptions=True)
+    context_aggregator = LLMContextAggregatorPair(
+        context,
+        user_params=LLMUserAggregatorParams(vad_analyzer=vad),
     )
 
+    global global_context
+    global_context = context_aggregator
+
+    # Pipeline — input → stt → user_agg → llm → tts → output → assistant_agg
+    # NOTE: No manual RTVIProcessor here. PipelineTask auto-prepends one.
+    pipeline = Pipeline([
+        transport.input(),
+        stt,
+        context_aggregator.user(),
+        llm,
+        tts,
+        transport.output(),
+        context_aggregator.assistant(),
+    ])
+
+    task = PipelineTask(
+        pipeline,
+        params=PipelineParams(
+            allow_interruptions=True,
+            enable_metrics=True,
+            enable_usage_metrics=True,
+        ),
+    )
+
+    # --- Lifecycle event handlers ---
+    # PipelineTask auto-registers on_client_ready to call set_bot_ready().
+    # We add a SECOND handler to also trigger the greeting.
+
+    @task.rtvi.event_handler("on_client_ready")
+    async def on_client_ready(rtvi):
+        """Client is connected and ready — instant TTS greeting then LLM news summary."""
+        logger.info("Client ready — sending instant greeting + news summary")
+        greeting = get_time_greeting()
+        # Instant fixed greeting via TTS (no LLM latency)
+        await task.queue_frames([
+            TTSSpeakFrame(
+                text=f"Good {greeting}! Welcome to NewsBot, your live AI news anchor. "
+                     f"Here are today's top stories."
+            ),
+            # Then trigger LLM for the actual news summary
+            LLMRunFrame(),
+        ])
+
+    @transport.event_handler("on_client_disconnected")
+    async def on_client_disconnected(transport, webrtc_connection):
+        logger.info("Client disconnected")
+        await task.cancel()
+
+    runner = PipelineRunner(handle_sigint=False)
     await runner.run(task)
 
 
@@ -565,24 +550,40 @@ async def refresh_news(request: Request):
 
 
 @app.post("/api/offer")
-async def sdp_offer(request: Request):
-    """Handle WebRTC offer for voice connection."""
+async def sdp_offer(request: Request, background_tasks: BackgroundTasks):
+    """Handle WebRTC offer for voice connection.
+    
+    Follows the pipecat reference pattern:
+    - Tracks peer connections in pcs_map for lifecycle management
+    - Uses BackgroundTasks (not asyncio.create_task) for proper cleanup
+    - Supports reconnection via pc_id
+    """
     data = await request.json()
-    sdp = data['sdp']
-    type = data['type']
-    
-    # Create new WebRTC connection
-    conn = SmallWebRTCConnection()
-    
-    # Initialize with the incoming offer
-    await conn.initialize(sdp, type)
-    
-    # Get the answer
-    answer = conn.get_answer()
-    
-    # Start the bot pipeline in the background
-    asyncio.create_task(run_bot_impl(conn))
-    
+    pc_id = data.get("pc_id")
+
+    if pc_id and pc_id in pcs_map:
+        # Reconnection to existing session
+        pipecat_connection = pcs_map[pc_id]
+        logger.info(f"Reusing existing connection for pc_id: {pc_id}")
+        await pipecat_connection.renegotiate(
+            sdp=data["sdp"],
+            type=data["type"],
+            restart_pc=data.get("restart_pc", False),
+        )
+    else:
+        # New connection
+        pipecat_connection = SmallWebRTCConnection()
+        await pipecat_connection.initialize(sdp=data["sdp"], type=data["type"])
+
+        @pipecat_connection.event_handler("closed")
+        async def handle_disconnected(webrtc_connection: SmallWebRTCConnection):
+            logger.info(f"Discarding peer connection for pc_id: {webrtc_connection.pc_id}")
+            pcs_map.pop(webrtc_connection.pc_id, None)
+
+        background_tasks.add_task(run_bot_impl, pipecat_connection)
+
+    answer = pipecat_connection.get_answer()
+    pcs_map[answer["pc_id"]] = pipecat_connection
     return answer
 
 

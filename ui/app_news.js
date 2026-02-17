@@ -10,6 +10,7 @@ class NewsAnchorApp {
         this.remoteAudio = null;
         this.dataChannel = null;
         this.isConnected = false;
+        this.pcId = null;
 
         // State
         this.config = {
@@ -329,17 +330,23 @@ class NewsAnchorApp {
                 });
             }
 
+            const offerPayload = {
+                sdp: this.peerConnection.localDescription.sdp,
+                type: this.peerConnection.localDescription.type
+            };
+            if (this.pcId) offerPayload.pc_id = this.pcId;
+
             const response = await fetch('/api/offer', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    sdp: this.peerConnection.localDescription.sdp,
-                    type: this.peerConnection.localDescription.type
-                })
+                body: JSON.stringify(offerPayload)
             });
 
             const answer = await response.json();
-            await this.peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+            this.pcId = answer.pc_id;
+            await this.peerConnection.setRemoteDescription(
+                new RTCSessionDescription({ sdp: answer.sdp, type: answer.type })
+            );
 
             document.getElementById('startBtn').style.display = 'none';
             document.getElementById('stopBtn').style.display = 'block';
@@ -354,9 +361,18 @@ class NewsAnchorApp {
     setupDataChannel(channel) {
         channel.onopen = () => {
             console.log('Data channel open');
+            // Ping keepalive — pipecat's SmallWebRTCConnection._idle_watcher
+            // kills the connection if no ping is received within a few seconds.
             this.pingInterval = setInterval(() => {
                 if (channel.readyState === 'open') channel.send('ping:' + Date.now());
             }, 1000);
+            // Signal client-ready so the server RTVI handler kicks off the greeting
+            channel.send(JSON.stringify({
+                label: 'rtvi-ai',
+                type: 'client-ready',
+                id: 'msg-' + Date.now(),
+                data: null
+            }));
         };
 
         channel.onmessage = (e) => {
@@ -434,6 +450,7 @@ class NewsAnchorApp {
         if (this.peerConnection) this.peerConnection.close();
         if (this.localStream) this.localStream.getTracks().forEach(t => t.stop());
         if (this.pingInterval) clearInterval(this.pingInterval);
+        this.pcId = null;
 
         this.updateStatus('disconnected');
         document.getElementById('startBtn').style.display = 'block';

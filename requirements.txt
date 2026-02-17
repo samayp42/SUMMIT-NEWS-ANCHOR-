@@ -7,7 +7,7 @@
 # Or with uv: uv pip install -r requirements.txt
 
 # Core framework (includes Ollama LLM, Piper & Kokoro TTS, WebRTC transport)
-pipecat-ai[webrtc,silero,piper,ollama,kokoro]>=0.0.99
+pipecat-ai[webrtc,silero,ollama,kokoro]>=0.0.99
 
 # Web server
 fastapi>=0.104.0
