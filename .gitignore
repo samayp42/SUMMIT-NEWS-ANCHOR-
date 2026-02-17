@@ -19,3 +19,6 @@ voices.bin
 # Logs
 *.log
 *.wav
+/macos-local-voice-agents
+/weebo
+log.txt
